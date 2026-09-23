@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Family Events</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%236d5dfc'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='42' fill='white'%3E%E2%99%A1%3C/text%3E%3C/svg%3E">
+<script src="https://telegram.org/js/telegram-web-app.js?63"></script>
+<style>
+:root{--bg:var(--tg-theme-bg-color,#f7f6f2);--card:var(--tg-theme-secondary-bg-color,#fff);--text:var(--tg-theme-text-color,#242424);--muted:var(--tg-theme-hint-color,#777);--accent:var(--tg-theme-button-color,#6d5dfc);--button-text:var(--tg-theme-button-text-color,#fff);--soft:color-mix(in srgb,var(--accent) 12%,var(--bg))}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+.app{max-width:480px;min-height:100vh;margin:auto;padding:20px 20px calc(20px + env(safe-area-inset-bottom));display:flex;flex-direction:column}
+.brand{display:flex;align-items:center;gap:10px;font-weight:750;font-size:18px}.logo{width:38px;height:38px;border-radius:13px;background:var(--accent);display:grid;place-items:center;color:white;font-size:20px}
+.login{flex:1;display:flex;flex-direction:column;justify-content:center}.login h1{font-size:36px;line-height:1.05;margin:18px 0 10px}.sub{color:var(--muted);line-height:1.5;margin:0 0 28px}
+.tgcard,.panel{background:var(--card);border-radius:24px;padding:20px;box-shadow:0 8px 30px rgba(0,0,0,.05)}
+.avatar{width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,#8d80ff,#5b49f5);color:#fff;display:grid;place-items:center;font-weight:700;font-size:22px}
+.user{display:flex;align-items:center;gap:14px;margin-bottom:18px}.user strong{display:block}.user span{font-size:13px;color:var(--muted)}
+button{width:100%;border:0;border-radius:16px;padding:16px;font-size:16px;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:var(--button-text)}.secondary{background:var(--soft);color:var(--accent)}
+.home{display:none}.top{display:flex;justify-content:space-between;align-items:center;margin:20px 0 32px}.miniavatar{width:42px;height:42px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:700;color:var(--accent)}
+h2{font-size:30px;margin:0 0 8px}.eyebrow{font-size:14px;color:var(--muted);margin-bottom:6px}
+.empty{text-align:center;padding:40px 15px}.gift{font-size:52px;margin-bottom:16px}.empty h3{font-size:21px;margin:0 0 8px}.empty p{color:var(--muted);line-height:1.45;margin:0 0 24px}
+.note{text-align:center;color:#999;font-size:12px;padding:18px 0}.logout{background:none;width:auto;padding:8px;color:var(--muted);font-weight:600}
+</style></head>
+<body><main class="app">
+<section id="login">
+ <div class="brand"><div class="logo">♡</div>Family Events</div>
+ <div class="login"><div class="eyebrow">Добро пожаловать</div><h1>Все важные события семьи — в одном месте</h1>
+ <p class="sub">Откройте приложение в Telegram, чтобы увидеть свой профиль.</p>
+ <div class="tgcard"><div class="user"><div class="avatar">A</div><div><strong>Демо-режим</strong><span>Профиль Telegram доступен при запуске через бота</span></div></div>
+ <button class="primary" onclick="login()">Посмотреть прототип</button></div></div>
+ <div class="note">В браузере доступен демонстрационный режим</div>
+</section>
+<section id="home" class="home">
+ <div class="top"><div class="brand"><div class="logo">♡</div>Family Events</div><div class="miniavatar">A</div></div>
+ <div class="eyebrow">Главная</div><h2>Списки желаний</h2>
+ <p class="sub">Сохраняйте идеи подарков и делитесь ими с близкими.</p>
+ <div class="panel empty"><div class="gift">🎁</div><h3>Здесь будут ваши списки желаний</h3><p>Создайте первый список — эта функция появится на следующем этапе.</p>
+ <button class="secondary" onclick="demo()">Создать список</button></div>
+ <button id="logout" class="logout" onclick="logout()">← Выйти из прототипа</button>
+</section>
+</main>
+<script>
+const tg=window.Telegram?.WebApp;
+const telegramUser=tg?.initData ? tg.initDataUnsafe?.user : null;
+if(tg){tg.ready();tg.expand()}
+function login(){localStorage.setItem('fe-demo-login','1');render()}
+function logout(){localStorage.removeItem('fe-demo-login');render()}
+function demo(){tg?.HapticFeedback?.impactOccurred('light');const message='Функция создания списка будет добавлена на следующем этапе MVP.';if(tg?.initData&&tg.showAlert)tg.showAlert(message);else alert(message)}
+function render(){
+  const ok=!!telegramUser||localStorage.getItem('fe-demo-login')==='1';
+  document.getElementById('login').style.display=ok?'none':'flex';
+  document.getElementById('home').style.display=ok?'block':'none';
+  document.getElementById('logout').hidden=!!telegramUser;
+  if(telegramUser){
+    const name=[telegramUser.first_name,telegramUser.last_name].filter(Boolean).join(' ')||'Пользователь Telegram';
+    document.querySelector('.miniavatar').textContent=name.charAt(0).toUpperCase();
+    document.querySelector('#home .eyebrow').textContent=`${name} · Telegram ID ${telegramUser.id}`;
+  }
+}
+render();
+</script></body></html>

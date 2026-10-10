@@ -52,6 +52,12 @@ it("validates JWT identity mapping, nonce, audience and replay transaction", asy
     },
   ]);
   expect((await finishOidc("code", state)).user.telegramId).toBe("123456");
+  token = await jwt({ id: "123456", name: "Иван", nonce: "valid-nonce" });
+  expect((await finishOidc("code", state)).user.telegramId).toBe("123456");
+  for (const id of ["123abc", "1e3", "-1", "9007199254740992", 1.5]) {
+    token = await jwt({ id, name: "Иван", nonce: "valid-nonce" });
+    await expect(finishOidc("code", state)).rejects.toThrow();
+  }
   token = await jwt({ id: 123456, name: "Иван", nonce: "wrong" });
   await expect(finishOidc("code", state)).rejects.toThrow();
   token = await jwt({ name: "Иван", nonce: "valid-nonce" });

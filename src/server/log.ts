@@ -8,6 +8,10 @@ export function log(
     status?: number;
     durationMs?: number;
     missingSetting?: string;
+    idType?: string;
+    nameType?: string;
+    idValid?: boolean;
+    nameValid?: boolean;
   } = {},
 ) {
   console.info(

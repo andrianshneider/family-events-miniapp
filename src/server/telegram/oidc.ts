@@ -5,6 +5,7 @@ import { db } from "../db/client";
 import { token, tokenHash, encrypt, decrypt, safeEqual } from "../auth/crypto";
 import { setting } from "../config";
 import { AppError } from "../errors";
+import { log } from "../log";
 import type { VerifiedTelegramUser } from "./init-data";
 const issuer = "https://oauth.telegram.org";
 const keys = createRemoteJWKSet(new URL(issuer + "/.well-known/jwks.json"));
@@ -91,22 +92,34 @@ export async function finishOidc(
   )
     throw new AppError(401, "OIDC_NONCE_INVALID", "Повторите вход.");
   // The signed profile claim `id`, not OIDC `sub`, is the Mini App Telegram ID.
+  const telegramId =
+    typeof claims.id === "number"
+      ? claims.id
+      : typeof claims.id === "string" && /^[1-9][0-9]{0,15}$/.test(claims.id)
+        ? Number(claims.id)
+        : NaN;
   if (
-    typeof claims.id !== "number" ||
-    !Number.isSafeInteger(claims.id) ||
-    claims.id <= 0 ||
+    !Number.isSafeInteger(telegramId) ||
+    telegramId <= 0 ||
     typeof claims.name !== "string" ||
     !claims.name.trim()
-  )
+  ) {
+    log("oidc_profile_unmapped", {
+      idType: typeof claims.id,
+      nameType: typeof claims.name,
+      idValid: Number.isSafeInteger(telegramId) && telegramId > 0,
+      nameValid: typeof claims.name === "string" && !!claims.name.trim(),
+    });
     throw new AppError(
       401,
       "OIDC_IDENTITY_UNMAPPED",
       "Telegram не подтвердил идентификатор аккаунта.",
     );
+  }
   return {
     path: returnPath(row.return_path),
     user: {
-      telegramId: String(claims.id),
+      telegramId: String(telegramId),
       displayName: claims.name.slice(0, 128),
       username:
         typeof claims.preferred_username === "string"

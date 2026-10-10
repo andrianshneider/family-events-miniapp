@@ -19,4 +19,4 @@ try{
   const url=new URL(admin);url.username=name+'.'+process.env.SUPABASE_PROJECT_REF;url.password=password;url.port='6543';set(key,url.toString());
  }
  await writeFile('.env.local',env,{mode:0o600});console.info('Restricted runtime and worker connections stored locally.');
-}finally{await sql.end();}
+}catch(error){console.error('Runtime provisioning failed; code: '+(error&&typeof error==='object'&&'code' in error?String(error.code):'CONFIG_OR_NETWORK'));process.exitCode=1;}finally{await sql.end();}

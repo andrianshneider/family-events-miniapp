@@ -6,7 +6,7 @@ import { bot,BotError } from '../telegram/bot';
 const message=z.object({text:z.string().min(1).max(4096)}).strict();
 export async function deliver(){
  const sql=postgres(setting('DATABASE_WORKER_URL'),{prepare:false,max:1,ssl:process.env.DATABASE_SSL==='false'?false:'require'});let sent=0;
- try{const jobs=await sql`SELECT * FROM app.claim_notifications(10)`;
+ try{const jobs=await sql`SELECT id,chat_id,payload,attempt,lease::text AS lease FROM app.claim_notifications(3)`;
  for(const job of jobs){
   const [check]=await sql`SELECT app.notification_deliverable(${job.id},${job.lease}) AS allowed`;
   if(!check.allowed){await sql`SELECT app.finish_notification(${job.id},${job.lease},NULL,'CANCELLED',1)`;continue;}

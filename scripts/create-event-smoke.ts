@@ -369,6 +369,14 @@ try {
     listed.some((item: { id: string }) => item.id === event.id) &&
       listed.some((item: { id: string }) => item.id === fullEvent.id),
   );
+  assert.equal(
+    listed.find((item: { id: string }) => item.id === event.id).coverUrl,
+    null,
+  );
+  assert.equal(
+    listed.find((item: { id: string }) => item.id === fullEvent.id).coverUrl,
+    fullDetail.coverUrl,
+  );
   phase = "expired session and safe auth return";
   const hash = createHash("sha256").update(owner.cookie.split("=")[1]).digest();
   await sql`UPDATE app.organizer_sessions SET created_at=now()-make_interval(days=>31),expires_at=now()-make_interval(secs=>1) WHERE token_hash=${hash}`;

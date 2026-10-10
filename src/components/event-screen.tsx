@@ -130,7 +130,7 @@ export function EventScreen({
             ["Адрес", event.address],
             ["Как найти", event.directions],
             ["Описание", event.description],
-            ["Dress code", event.dressCode],
+            ["Дресс-код", event.dressCode],
           ].map(([label, value]) =>
             value ? (
               <section className="event-text" key={label}>

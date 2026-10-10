@@ -284,6 +284,7 @@ a:focus-visible {
 }
 .field {
   margin-top: 20px;
+  min-width: 0;
 }
 .label-row {
   display: flex;
@@ -507,4 +508,16 @@ a:focus-visible {
 .form-panels > .panel:has(> .timezone) > .timezone,
 .form-panels > .panel:has(> .timezone) > .field:has(input[type="date"]) {
   grid-column: 1 / -1;
+}
+.event-shell h1[tabindex="-1"]:focus {
+  outline: none;
+}
+.list-cover {
+  height: 180px;
+  margin-bottom: 20px;
+}
+@media (max-width: 599px) {
+  .form-panels > .panel:has(> .timezone) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

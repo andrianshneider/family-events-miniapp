@@ -196,6 +196,7 @@ it("creates real events atomically and enforces validation, idempotency and owne
     expect(all.events.map((event: { id: string }) => event.id)).toEqual([
       first.id,
     ]);
+    expect(all.events[0].coverUrl).toBeNull();
     const [instant] =
       (await query`SELECT starts_at,ends_at,effective_at::text FROM app.events WHERE id=${first.id}`) as {
         starts_at: null;
@@ -263,6 +264,25 @@ it("creates real events atomically and enforces validation, idempotency and owne
       description: full.description,
       coverUrl: `/api/v1/events/${second.id}/cover`,
     });
+    const refreshedList = (
+      await (
+        await list(new Request("https://example.test/api/v1/events"))
+      ).json()
+    ).data.events;
+    expect(
+      refreshedList.find((event: { id: string }) => event.id === second.id)
+        .coverUrl,
+    ).toBe(`/api/v1/events/${second.id}/cover`);
+    bridge.cookies.set("__Host-fe_org", other.raw);
+    const otherList = (
+      await (
+        await list(new Request("https://example.test/api/v1/events"))
+      ).json()
+    ).data.events;
+    expect(
+      otherList.some((event: { id: string }) => event.id === second.id),
+    ).toBe(false);
+    bridge.cookies.set("__Host-fe_org", owner.raw);
     await pg.exec(
       "RESET ROLE; CREATE FUNCTION app.test_fail_wishlist() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$; CREATE TRIGGER test_failure BEFORE INSERT ON app.wishlists FOR EACH ROW EXECUTE FUNCTION app.test_fail_wishlist(); SET ROLE fe_server;",
     );

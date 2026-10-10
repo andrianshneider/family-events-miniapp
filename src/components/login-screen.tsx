@@ -2,6 +2,7 @@
 import { InstallHelp } from "./install-help";
 import Script from "next/script";
 import { useEffect, useState } from "react";
+import { isTelegramLaunch } from "@/lib/telegram-launch";
 type TelegramWindow = Window & {
   Telegram?: {
     WebApp?: {
@@ -26,11 +27,10 @@ export function LoginScreen({
   const [miniLaunch, setMiniLaunch] = useState(false);
   useEffect(() => {
     // This is only SDK loading detection; identity is always established by the server.
-    const mini =
-      new URLSearchParams(window.location.hash.slice(1)).has("tgWebAppData") ||
-      !!(window as TelegramWindow).Telegram?.WebApp?.initData;
+    const mini = isTelegramLaunch(window);
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMiniLaunch(mini);
+    const sdkTimeout = window.setTimeout(() => setSdkReady(true), 15000);
     const restore = async () => {
       if (document.visibilityState !== "visible") return;
       setPending(false);
@@ -51,6 +51,7 @@ export function LoginScreen({
     document.addEventListener("visibilitychange", restore);
     window.addEventListener("pageshow", show);
     return () => {
+      window.clearTimeout(sdkTimeout);
       document.removeEventListener("visibilitychange", restore);
       window.removeEventListener("pageshow", show);
     };
@@ -61,12 +62,11 @@ export function LoginScreen({
     setRestart(false);
     const app = (window as TelegramWindow).Telegram?.WebApp;
     if (!app?.initData) {
-      window.location.assign(
-        new URL(
-          "/api/auth/telegram/start?returnTo=" + encodeURIComponent(returnTo),
-          window.location.origin,
-        ).href,
+      setPending(false);
+      setError(
+        "Не удалось загрузить данные Telegram. Закройте Mini App и снова откройте его через бота.",
       );
+      setRestart(true);
       return;
     }
     try {
@@ -75,6 +75,7 @@ export function LoginScreen({
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ initData: app.initData }),
+        signal: AbortSignal.timeout(15000),
       });
       const result = await response.json();
       if (!response.ok) {
@@ -108,6 +109,7 @@ export function LoginScreen({
           const app = (window as TelegramWindow).Telegram?.WebApp;
           app?.ready();
           app?.expand();
+          setMiniLaunch(isTelegramLaunch(window));
           setSdkReady(true);
         }}
       />
@@ -126,14 +128,12 @@ export function LoginScreen({
         }
         aria-disabled={pending || (miniLaunch && !sdkReady)}
         onClick={(event) => {
-          if (pending || (miniLaunch && !sdkReady)) {
+          const mini = isTelegramLaunch(window);
+          if (pending || (mini && !sdkReady)) {
             event.preventDefault();
             return;
           }
-          if (
-            (window as TelegramWindow).Telegram?.WebApp?.initData ||
-            miniLaunch
-          ) {
+          if (mini) {
             event.preventDefault();
             void signIn();
           }

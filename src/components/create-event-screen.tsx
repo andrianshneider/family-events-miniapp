@@ -85,7 +85,7 @@ const groups: {
     title: "Детали для гостей",
     fields: [
       { key: "description", label: "Описание", max: 1000, type: "textarea" },
-      { key: "dressCode", label: "Dress code", max: 300, type: "textarea" },
+      { key: "dressCode", label: "Дресс-код", max: 300, type: "textarea" },
     ],
   },
 ];

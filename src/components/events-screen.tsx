@@ -2,6 +2,7 @@
 import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { readEventForm } from "@/lib/event-form-state";
 type EventItem = {
   id: string;
@@ -10,6 +11,7 @@ type EventItem = {
   startTime: string | null;
   timezone: string;
   venueName: string | null;
+  coverUrl: string | null;
 };
 type Loaded = {
   name: string;
@@ -190,6 +192,17 @@ export function EventsScreen() {
               {data.events.map((e) => (
                 <li className="card" key={e.id}>
                   <Link href={`/events/${e.id}`} className="event-card-link">
+                    {e.coverUrl && (
+                      <div className="event-cover list-cover">
+                        <Image
+                          unoptimized
+                          width={800}
+                          height={480}
+                          src={e.coverUrl}
+                          alt={`Обложка события «${e.title}»`}
+                        />
+                      </div>
+                    )}
                     <h2>{e.title}</h2>
                     <p>
                       {new Intl.DateTimeFormat("ru-RU", {

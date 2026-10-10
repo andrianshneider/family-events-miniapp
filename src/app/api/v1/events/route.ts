@@ -33,8 +33,8 @@ export const GET = endpoint(async (request, id) => {
     }
   }
   const events = cursor
-    ? await db()`SELECT id,title,event_type,event_date::text,start_time::text,timezone,venue_name FROM app.events WHERE organizer_id=${principal.userId} AND deleted_at IS NULL AND (event_date,id)<(${cursor.date}::date,${cursor.id}::uuid) ORDER BY event_date DESC,id DESC LIMIT 101`
-    : await db()`SELECT id,title,event_type,event_date::text,start_time::text,timezone,venue_name FROM app.events WHERE organizer_id=${principal.userId} AND deleted_at IS NULL ORDER BY event_date DESC,id DESC LIMIT 101`;
+    ? await db()`SELECT id,title,event_type,event_date::text,start_time::text,timezone,venue_name,cover_asset_id FROM app.events WHERE organizer_id=${principal.userId} AND deleted_at IS NULL AND (event_date,id)<(${cursor.date}::date,${cursor.id}::uuid) ORDER BY event_date DESC,id DESC LIMIT 101`
+    : await db()`SELECT id,title,event_type,event_date::text,start_time::text,timezone,venue_name,cover_asset_id FROM app.events WHERE organizer_id=${principal.userId} AND deleted_at IS NULL ORDER BY event_date DESC,id DESC LIMIT 101`;
   const last = events[99];
   return reply(
     {
@@ -46,6 +46,7 @@ export const GET = endpoint(async (request, id) => {
         startTime: e.start_time,
         timezone: e.timezone,
         venueName: e.venue_name,
+        coverUrl: e.cover_asset_id ? `/api/v1/events/${e.id}/cover` : null,
       })),
       hasMore: events.length > 100,
       nextCursor:

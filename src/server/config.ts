@@ -40,14 +40,17 @@ export function config() {
     throw new Error("HTTPS required");
   return parsed.data;
 }
-export function setting(name: string) {
+type SettingName = keyof z.infer<typeof schema> | "DATABASE_WORKER_URL";
+export class MissingSettingError extends Error {
+  readonly code = "CONFIGURATION_ERROR";
+  constructor(readonly settingName: SettingName) {
+    super("Missing server setting: " + settingName);
+  }
+}
+export function setting(name: SettingName) {
   const value = process.env[name];
   if (!value) {
-    const error = new Error("Missing server setting: " + name) as Error & {
-      code: string;
-    };
-    error.code = "CONFIGURATION_ERROR";
-    throw error;
+    throw new MissingSettingError(name);
   }
   return value;
 }

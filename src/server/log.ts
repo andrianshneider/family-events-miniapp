@@ -7,6 +7,7 @@ export function log(
     code?: string;
     status?: number;
     durationMs?: number;
+    missingSetting?: string;
   } = {},
 ) {
   console.info(

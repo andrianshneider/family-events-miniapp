@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppError } from "./errors";
 import { log } from "./log";
+import { MissingSettingError } from "./config";
 export const reply = (data: unknown, requestId: string, status = 200) =>
   NextResponse.json(
     { data, requestId },
@@ -45,6 +46,9 @@ export function endpoint(
         requestId,
         status,
         code: known ? error.code : operationalCode(error),
+        ...(error instanceof MissingSettingError
+          ? { missingSetting: error.settingName }
+          : {}),
         durationMs: Date.now() - start,
       });
       return NextResponse.json(

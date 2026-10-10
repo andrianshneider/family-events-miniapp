@@ -26,7 +26,8 @@ const allowed = [
 const values: Record<string, string> = {
   APP_ENV: "staging",
   APP_URL:
-    "https://family-events-miniapp-git-infrastructure-foundation-ast-dbae.vercel.app",
+    process.env.STAGING_APP_URL ||
+    "https://family-events-staging.vercel.app",
 };
 for (const key of allowed)
   if (process.env[key]) values[key] = process.env[key]!;

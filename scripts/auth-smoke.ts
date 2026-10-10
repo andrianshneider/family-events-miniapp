@@ -208,6 +208,35 @@ try {
       .status,
     401,
   );
+  const reauthCookie = cookie(logout, "__Host-fe_reauth", 300);
+  const relogin = await fetch(root + "/api/auth/telegram/mini-app", {
+    method: "POST",
+    headers: {
+      Origin: new URL(root).origin,
+      "Content-Type": "application/json",
+      Cookie: reauthCookie,
+    },
+    body: JSON.stringify({ initData }),
+  });
+  assert.equal(relogin.status, 200);
+  assert.equal((await relogin.json()).data.id, userId);
+  const newCookie = cookie(relogin, "__Host-fe_org", 30 * 86400);
+  assert.notEqual(newCookie, orgCookie);
+  assert.equal(
+    (await fetch(root + "/api/v1/me", { headers: { Cookie: newCookie } }))
+      .status,
+    200,
+  );
+  const reused = await fetch(root + "/api/auth/telegram/mini-app", {
+    method: "POST",
+    headers: {
+      Origin: new URL(root).origin,
+      "Content-Type": "application/json",
+      Cookie: reauthCookie,
+    },
+    body: JSON.stringify({ initData }),
+  });
+  assert.equal(reused.status, 401);
   const guest = await fetch(root + "/api/guest/session", {
     method: "POST",
     headers: { Origin: new URL(root).origin },
@@ -220,7 +249,7 @@ try {
   });
   assert.equal(guestCsrf.status, 200);
   console.info(
-    "PASS: staging signed initData, stale/forged/replay rejection, same-session retry, secure cookies, profile, empty state, real DB events, pagination, owner isolation, refresh, expiry redirect, CSRF, logout revocation. Synthetic identities only; real Telegram and iPhone sign-in require device verification.",
+    "PASS: staging signed initData, stale/forged/replay rejection, same-session retry, secure cookies, profile, empty state, real DB events, pagination, owner isolation, refresh, expiry redirect, CSRF, logout revocation, one-use browser-bound relogin. Synthetic identities only; real Telegram and iPhone sign-in require device verification.",
   );
 } catch {
   console.error("Auth smoke failed; tokens and payloads not printed.");

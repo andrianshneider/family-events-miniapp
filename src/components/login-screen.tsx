@@ -3,15 +3,24 @@ import { InstallHelp } from "./install-help";
 import Script from "next/script";
 import { useState } from "react";
 type TelegramWindow = Window & {
-  Telegram?: { WebApp?: { initData?: string; ready(): void; expand(): void } };
+  Telegram?: {
+    WebApp?: {
+      initData?: string;
+      ready(): void;
+      expand(): void;
+      close(): void;
+    };
+  };
 };
 export function LoginScreen({ initialError = "" }: { initialError?: string }) {
   const [pending, setPending] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState(initialError);
+  const [restart, setRestart] = useState(false);
   async function signIn() {
     setPending(true);
     setError("");
+    setRestart(false);
     const app = (window as TelegramWindow).Telegram?.WebApp;
     if (!app?.initData) {
       window.location.assign(
@@ -30,10 +39,21 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
         body: JSON.stringify({ initData: app.initData }),
       });
       const result = await response.json();
-      if (!response.ok)
+      if (!response.ok) {
+        if (
+          ["INVALID_TELEGRAM_DATA", "TELEGRAM_DATA_REPLAYED"].includes(
+            result.error?.code,
+          )
+        ) {
+          setRestart(true);
+          throw Error(
+            "Данные входа устарели. Закройте Mini App и снова откройте его через бота Telegram.",
+          );
+        }
         throw Error(
           result.error?.message ?? "Не удалось войти. Повторите попытку.",
         );
+      }
       window.location.replace("/events");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось войти.");
@@ -72,6 +92,14 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
         <p role="alert" className="error">
           {error}
         </p>
+      )}
+      {restart && (
+        <button
+          className="secondary"
+          onClick={() => (window as TelegramWindow).Telegram?.WebApp?.close()}
+        >
+          Закрыть Mini App
+        </button>
       )}
       <p className="small muted">Ваши события доступны только вам.</p>
       <InstallHelp />

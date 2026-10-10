@@ -6,6 +6,7 @@ import { db, type Transaction } from "../db/client";
 import { token, tokenHash } from "./crypto";
 import { unauthenticated } from "../errors";
 export const ORG_COOKIE = "__Host-fe_org",
+  REAUTH_COOKIE = "__Host-fe_reauth",
   GUEST_COOKIE = "__Host-fe_guest";
 export const ORG_TTL = 30 * 86400,
   GUEST_TTL = 180 * 86400;

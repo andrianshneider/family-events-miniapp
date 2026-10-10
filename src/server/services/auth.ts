@@ -25,6 +25,7 @@ export async function loginMiniApp(
   user: VerifiedTelegramUser,
   initData: string,
   previous?: string,
+  reauth?: string,
 ) {
   const digest = tokenHash(
     new URLSearchParams(
@@ -38,6 +39,15 @@ export async function loginMiniApp(
     const [claimed] =
       await tx`INSERT INTO app.mini_app_logins(digest,expires_at) VALUES(${digest},now()+interval '5 minutes') ON CONFLICT(digest) DO NOTHING RETURNING digest`;
     if (!claimed) {
+      if (reauth && /^[\w-]{43}$/.test(reauth)) {
+        const [grant] =
+          await tx`SELECT l.digest FROM app.mini_app_logins l JOIN app.organizer_sessions s ON s.token_hash=l.session_hash JOIN app.users u ON u.id=s.user_id WHERE l.digest=${digest} AND l.reauth_hash=${tokenHash(reauth)} AND l.expires_at>now() AND s.revoked_at IS NOT NULL AND u.telegram_user_id=${user.telegramId} FOR UPDATE OF l`;
+        if (grant) {
+          const result = await authenticate(tx, user);
+          await tx`UPDATE app.mini_app_logins SET session_hash=${tokenHash(result.raw)},reauth_hash=NULL WHERE digest=${digest}`;
+          return result;
+        }
+      }
       if (previous && /^[\w-]{43}$/.test(previous)) {
         const [session] =
           await tx`SELECT u.id,u.display_name FROM app.mini_app_logins l JOIN app.organizer_sessions s ON s.token_hash=l.session_hash JOIN app.users u ON u.id=s.user_id WHERE l.digest=${digest} AND s.token_hash=${tokenHash(previous)} AND s.revoked_at IS NULL AND s.expires_at>now() AND u.telegram_user_id=${user.telegramId}`;

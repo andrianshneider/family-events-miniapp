@@ -136,6 +136,34 @@ it("runs organizer authentication, identity linking, pagination, isolation and s
     expect((await postMini(raw)).status).toBe(401);
     bridge.cookies.set("__Host-fe_org", firstToken);
 
+    const miniLogout = await logout(
+      new Request("https://example.test/api/auth/logout", {
+        method: "POST",
+        headers: {
+          Origin: "https://example.test",
+          "x-csrf-token": csrf(firstToken),
+        },
+      }),
+    );
+    expect(miniLogout.status).toBe(200);
+    accept(miniLogout, "__Host-fe_reauth");
+    const grant = bridge.cookies.get("__Host-fe_reauth")!;
+    bridge.cookies.delete("__Host-fe_org");
+    expect((await me(request("/api/v1/me"))).status).toBe(401);
+    bridge.cookies.set("__Host-fe_reauth", "x".repeat(43));
+    expect((await postMini(raw)).status).toBe(401);
+    bridge.cookies.set("__Host-fe_reauth", grant);
+    expect((await postMini(signed(111, 301))).status).toBe(401);
+    const relogin = await postMini(raw);
+    expect(relogin.status).toBe(200);
+    expect((await relogin.clone().json()).data.id).toBe(userId);
+    accept(relogin, "__Host-fe_org");
+    const reloginToken = bridge.cookies.get("__Host-fe_org")!;
+    expect(reloginToken).not.toBe(firstToken);
+    bridge.cookies.delete("__Host-fe_org");
+    expect((await postMini(raw)).status).toBe(401);
+    bridge.cookies.set("__Host-fe_org", reloginToken);
+
     const oidcStart = await start(request("/api/auth/telegram/start"));
     expect(oidcStart.status).toBe(307);
     accept(oidcStart, "__Host-fe_oidc");

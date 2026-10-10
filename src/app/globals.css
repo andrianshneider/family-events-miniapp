@@ -129,3 +129,32 @@ a:focus-visible {
     font-size: 29px;
   }
 }
+
+.install-help {
+  margin-top: 32px;
+  border-top: 1px solid #e6ddec;
+  padding-top: 20px;
+  font-size: 14px;
+  color: #756e7e;
+  line-height: 1.6;
+}
+.install-help summary {
+  cursor: pointer;
+  color: #7044b8;
+  min-height: 44px;
+  padding: 10px 0;
+}
+.install-help li {
+  margin: 10px 0;
+}
+.shell {
+  padding-top: max(32px, env(safe-area-inset-top));
+  padding-bottom: max(32px, env(safe-area-inset-bottom));
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
+}
+@media (display-mode: standalone) {
+  .install-help {
+    display: none;
+  }
+}

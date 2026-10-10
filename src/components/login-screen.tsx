@@ -1,4 +1,5 @@
 "use client";
+import { InstallHelp } from "./install-help";
 import Script from "next/script";
 import { useState } from "react";
 type TelegramWindow = Window & {
@@ -73,6 +74,7 @@ export function LoginScreen() {
         </p>
       )}
       <p className="small muted">Ваши события доступны только вам.</p>
+      <InstallHelp />
     </main>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState } from "react";
 type EventItem = {
   id: string;
@@ -151,6 +152,7 @@ export function EventsScreen() {
           Обновить список
         </button>
       )}
+      <InstallHelp />
     </main>
   );
 }

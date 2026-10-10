@@ -24,6 +24,7 @@ export default async function EventPage({
   }
   return (
     <EventScreen
+      key={event.id}
       initialEvent={event}
       created={(await searchParams).created === "1"}
     />

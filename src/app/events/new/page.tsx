@@ -17,6 +17,7 @@ export default async function NewEvent() {
     await db()`SELECT display_name FROM app.users WHERE id=${principal.userId}`;
   return (
     <CreateEventScreen
+      key={principal.userId}
       userId={principal.userId}
       displayName={user.display_name}
     />

@@ -108,6 +108,7 @@ export function CreateEventScreen({
   const [coverError, setCoverError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const form = useRef<HTMLFormElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelSource = useRef<HTMLElement | null>(null);
   const busy = useRef(false);
@@ -154,6 +155,7 @@ export function CreateEventScreen({
     setAttempt(savedAttempt);
     attemptRef.current = savedAttempt;
     setReady(true);
+    heading.current?.focus();
     setOnline(navigator.onLine);
     const network = () => setOnline(navigator.onLine);
     const restore = async () => {
@@ -209,6 +211,7 @@ export function CreateEventScreen({
   }
   function leave() {
     if (busy.current || uploadBusy.current) return;
+    if (dialog.current?.open) return;
     if (attempt) {
       setError(
         "Результат создания пока неизвестен. Сначала нажмите «Проверить создание», чтобы исключить повторное событие.",
@@ -419,7 +422,7 @@ export function CreateEventScreen({
     : null;
   return (
     <main className="shell event-shell">
-      <TelegramBack onBack={leave} />
+      <TelegramBack onBack={leave} warnBeforeClose={dirty || !!attempt} />
       <OrganizerHeader displayName={displayName} />
       <button
         className="text-button back"
@@ -428,7 +431,9 @@ export function CreateEventScreen({
       >
         ← Мои события
       </button>
-      <h1>Создать событие</h1>
+      <h1 ref={heading} tabIndex={-1}>
+        Создать событие
+      </h1>
       <p className="muted">
         Соберите близких в один день.
         <br />

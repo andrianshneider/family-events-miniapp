@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { organizerEvent } from "@/server/services/events";
 import { eventDateLabel, eventTypes } from "./event-presentation";
 import { TelegramBack } from "./telegram-back";
@@ -16,6 +16,10 @@ export function EventScreen({
   created: boolean;
 }) {
   const router = useRouter();
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
   const [event, setEvent] = useState(initialEvent);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -108,7 +112,9 @@ export function EventScreen({
           <p className="event-status">
             {event.isPast ? "Прошедшее событие" : "Предстоящее событие"}
           </p>
-          <h1 tabIndex={-1}>{event.title}</h1>
+          <h1 ref={heading} tabIndex={-1}>
+            {event.title}
+          </h1>
           <p className="muted">
             {eventTypes[event.eventType as keyof typeof eventTypes]}
           </p>

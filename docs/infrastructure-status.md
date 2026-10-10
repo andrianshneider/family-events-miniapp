@@ -24,3 +24,9 @@ The root now redirects to session-protected `/events`; unauthenticated visitors 
 Implementation is published in `infrastructure-foundation` (`7cbbe52`) and staging Preview; CI and deployment passed. Migration 005 adds hash-only Mini App replay protection. Organizer events now support cursor pagination, and resuming the app rechecks the session. OIDC cancellation/failure returns to the Russian login screen. Both remote staging smoke scripts passed; temporary fixtures were removed. No main merge or production publication occurred.
 
 Full acceptance remains pending real Telegram/Safari and installed iPhone PWA sign-in and callback return. See [verification report](01-organizer-auth-verification.md).
+
+## Vertical Slice 02 — 10 October 2026
+
+Event creation and the private organizer event page are implemented in `infrastructure-foundation` and staging Preview (`1feb189`). Existing schema is reused; no migration was needed. Published staging creation/Storage/concurrency/ownership smoke and Slice 01 auth/infrastructure regressions passed; synthetic records and Storage files were removed. Public invitation, editing, RSVP, gifts and notifications remain later slices. Address is manual because Mapbox is not configured.
+
+See [Slice 02 verification](02-create-event-verification.md). Actual iPhone/PWA interactions and visual acceptance remain pending; source 01 Safari/Telegram return limitation is preserved.

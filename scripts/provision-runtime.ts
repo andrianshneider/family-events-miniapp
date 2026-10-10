@@ -1,3 +1,4 @@
+import {databaseTls} from '../src/server/db/tls';
 // Run only with the migration administrator. No credential is printed.
 import nextEnv from '@next/env';
 const {loadEnvConfig}=nextEnv;
@@ -6,7 +7,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile,writeFile } from 'node:fs/promises';
 loadEnvConfig(process.cwd());
 const admin=process.env.DATABASE_ADMIN_URL;if(!admin)throw new Error('DATABASE_ADMIN_URL required');
-const sql=postgres(admin,{max:1,prepare:false,ssl:process.env.DATABASE_SSL==='false'?false:{rejectUnauthorized:true}});
+const sql=postgres(admin,{max:1,prepare:false,ssl:databaseTls()});
 let env=await readFile('.env.local','utf8');
 function set(name:string,value:string){const rx=new RegExp('^'+name+'=.*$','m');env=rx.test(env)?env.replace(rx,name+'='+value):env+'\n'+name+'='+value+'\n';}
 try{
@@ -17,7 +18,7 @@ try{
   // Identifiers and password have fixed/hex allowlists; no arbitrary SQL construction.
   await sql.unsafe(`CREATE ROLE ${name} LOGIN NOSUPERUSER NOBYPASSRLS INHERIT PASSWORD '${password}'`);
   await sql.unsafe(`GRANT ${group} TO ${name}`);
-  const url=new URL(admin);url.username=name+'.'+process.env.SUPABASE_PROJECT_REF;url.password=password;url.port='6543';set(key,url.toString());
+  const url=new URL(admin);url.username=name+'.'+process.env.SUPABASE_PROJECT_REF;url.password=password;url.port='6543';set(key,url.toString());await writeFile('.env.local',env,{mode:0o600});
  }
  await writeFile('.env.local',env,{mode:0o600});console.info('Restricted runtime and worker connections stored locally.');
 }catch(error){console.error('Runtime provisioning failed; code: '+(error&&typeof error==='object'&&'code' in error?String(error.code):'CONFIG_OR_NETWORK'));process.exitCode=1;}finally{await sql.end();}

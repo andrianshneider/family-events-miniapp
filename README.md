@@ -37,6 +37,7 @@ For HTTPS production-like tests, use Vercel Preview. Session cookies always use 
 | DATABASE_URL | dedicated LOGIN member of fe_server, transaction pooler, no BYPASSRLS |
 | DATABASE_WORKER_URL | dedicated LOGIN member of fe_worker; EXECUTE only |
 | DATABASE_SSL | true for Supabase; false only for isolated local DB |
+| DATABASE_CA_CERT_BASE64 | Supabase public root CA PEM, base64; certificate/hostname verification remains enabled; bundled official Supabase CA is the default |
 | SUPABASE_PROJECT_REF | provisioning helper for shared pooler usernames |
 | SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY | server-only Storage API |
 | SUPABASE_MEDIA_BUCKET | private `event-media` bucket |
@@ -62,6 +63,7 @@ Migrations:
 1. `202610100001_foundation.sql`: 18 contract tables plus encrypted Telegram inbox and distributed rate limits; UUIDs, bigint Telegram IDs, numeric prices, timezone/local datetime, RLS, grants, indexes and asset/subscription guards.
 2. `202610100002_transactions.sql`: atomic reserve/cancel/soft-delete; private worker functions for leased delivery and consent rechecks.
 3. `202610100003_webhook_worker.sql`: encrypted inbox leasing and channel updates, no implicit event opt-in.
+4. `202610100004_subscription_guard.sql`: enabled subscriptions require an active event and verified ready Telegram channel.
 
 Runtime fe_server is a trusted BFF group with explicit table policies and DML grants, no schema creation or superuser rights. It can read business rows, so each DAL/service operation must enforce resource authorization. Browser roles have neither schema/table grants nor policies. Worker has no table grants and can invoke only named SECURITY DEFINER functions with fixed search_path. Application schema must remain absent from hosted Data API exposed schemas.
 

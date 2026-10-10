@@ -1,3 +1,4 @@
+import {databaseTls} from '../db/tls';
 import 'server-only';
 import postgres from 'postgres';
 import { z } from 'zod';
@@ -5,7 +6,7 @@ import { setting } from '../config';
 import { bot,BotError } from '../telegram/bot';
 const message=z.object({text:z.string().min(1).max(4096)}).strict();
 export async function deliver(){
- const sql=postgres(setting('DATABASE_WORKER_URL'),{prepare:false,max:1,ssl:process.env.DATABASE_SSL==='false'?false:{rejectUnauthorized:true}});let sent=0;
+ const sql=postgres(setting('DATABASE_WORKER_URL'),{prepare:false,max:1,ssl:databaseTls()});let sent=0;
  try{const jobs=await sql`SELECT id,chat_id,payload,attempt,lease::text AS lease FROM app.claim_notifications(3)`;
  for(const job of jobs){
   const [check]=await sql`SELECT app.notification_deliverable(${job.id},${job.lease}) AS allowed`;

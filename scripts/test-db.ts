@@ -24,6 +24,7 @@ try{
  await pg.query('SELECT app.cancel_reservation($1,$2,$3)',[e.rows[0].public_id,g.rows[0].id,guests.rows[1].id]);
  assert.equal((await pg.query("SELECT * FROM app.gift_reservations WHERE status='active'")).rows.length,1);
  await assert.rejects(pg.query("INSERT INTO app.rsvps(event_id,guest_identity_id,guest_name,status,adults_count,children_count) VALUES($1,$2,'Guest','no',1,0)",[e.rows[0].id,guests.rows[0].id]));
+ await assert.rejects(pg.query("INSERT INTO app.notification_subscriptions(event_id,user_id,role,enabled,consented_at) VALUES($1,$2,'organizer',true,now())",[e.rows[0].id,u.rows[0].id]));
  await assert.rejects(pg.query('SELECT app.soft_delete_event($1,$2,1)',[e.rows[0].id,u.rows[1].id]));
  await assert.rejects(pg.query('SELECT app.soft_delete_event($1,$2,9)',[e.rows[0].id,u.rows[0].id]));
  await pg.query('SELECT app.soft_delete_event($1,$2,1)',[e.rows[0].id,u.rows[0].id]);

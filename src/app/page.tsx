@@ -1,2 +1,4 @@
-import { redirect } from 'next/navigation';
-export default function Home(){redirect('/01-telegram-login.html');}
+import { redirect } from "next/navigation";
+export default function Home() {
+  redirect("/01-telegram-login.html");
+}

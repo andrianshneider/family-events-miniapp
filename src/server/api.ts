@@ -8,8 +8,8 @@ export const reply=(data:unknown,requestId:string,status=200)=>NextResponse.json
 export function endpoint(handler:(request:Request,requestId:string)=>Promise<Response>){return async(request:Request)=>{
  const requestId=randomUUID(),start=Date.now();
  try{const response=await handler(request,requestId);log('request',{requestId,status:response.status,durationMs:Date.now()-start});return response;}
- catch(error){const known=error instanceof AppError;const status=known?error.status:500;
- log('request_failed',{requestId,status,code:known?error.code:'INTERNAL_ERROR',durationMs:Date.now()-start});
+ catch(caught){const error=caught instanceof z.ZodError?new AppError(422,'VALIDATION_ERROR','Проверьте поля.',z.flattenError(caught).fieldErrors as Record<string,string[]>):caught;const known=error instanceof AppError;const status=known?error.status:500;
+ log('request_failed',{requestId,status,code:known?error.code:operationalCode(error),durationMs:Date.now()-start});
  return NextResponse.json({error:{code:known?error.code:'INTERNAL_ERROR',message:known?error.message:'Не удалось выполнить запрос.',...(known&&error.fieldErrors?{fieldErrors:error.fieldErrors}:{})},requestId},{status,headers:{'Cache-Control':'private, no-store','X-Request-Id':requestId}});
  }
 };}
@@ -21,3 +21,5 @@ export async function input<T>(request:Request,schema:z.ZodType<T>,maxBytes=1638
  let raw:unknown;try{raw=JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new AppError(400,'INVALID_JSON','Некорректный JSON.');}
  const result=schema.safeParse(raw);if(!result.success)throw new AppError(422,'VALIDATION_ERROR','Проверьте поля.',z.flattenError(result.error).fieldErrors as Record<string,string[]>);return result.data;
 }
+
+function operationalCode(error:unknown){if(error&&typeof error==='object'&&'code' in error&&typeof error.code==='string'&&/^[A-Z0-9_]{1,48}$/.test(error.code))return error.code;return 'INTERNAL_ERROR';}

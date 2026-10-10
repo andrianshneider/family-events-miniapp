@@ -65,6 +65,8 @@ Migrations:
 
 Runtime fe_server is a trusted BFF group with explicit table policies and DML grants, no schema creation or superuser rights. It can read business rows, so each DAL/service operation must enforce resource authorization. Browser roles have neither schema/table grants nor policies. Worker has no table grants and can invoke only named SECURITY DEFINER functions with fixed search_path. Application schema must remain absent from hosted Data API exposed schemas.
 
+`node --conditions=react-server --import tsx scripts/live-dal-smoke.ts` checks the actual runtime role, hashed session, cross-owner access and idempotency with rollback.
+
 `pnpm test:db` uses PGlite (actual PostgreSQL engine) to apply migrations on a fresh disposable DB and check grants, uniqueness, repeat reservation, own cancellation, optimistic version and soft deletion. It is not a test of the hosted pooler or remote network. Live verification requires configured staging credentials and `pnpm smoke`.
 
 To reset a **disposable local** Supabase database, run `supabase db reset`. Do not reset hosted staging/production or drop their app schema to replay migrations. Synthetic DB fixtures are not automatically seeded in deployed environments. The internal readiness test creates/reads a synthetic user inside a transaction and rolls it back.

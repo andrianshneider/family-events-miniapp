@@ -16,4 +16,4 @@ export function config() {
  if(parsed.data.APP_ENV!=='local' && !parsed.data.APP_URL.startsWith('https://')) throw new Error('HTTPS required');
  return parsed.data;
 }
-export function setting(name:string) {const value=process.env[name];if(!value)throw new Error('Missing server setting: '+name);return value;}
+export function setting(name:string) {const value=process.env[name];if(!value){const error=new Error('Missing server setting: '+name) as Error & {code:string};error.code='CONFIGURATION_ERROR';throw error;}return value;}

@@ -6,7 +6,7 @@ import { decrypt } from '../auth/crypto';
 const privateChat=z.object({id:z.number().int().positive().max(Number.MAX_SAFE_INTEGER),type:z.literal('private')});
 const user=z.object({id:z.number().int().positive().max(Number.MAX_SAFE_INTEGER)});
 const update=z.object({message:z.object({text:z.string().optional(),chat:privateChat,from:user}).optional(),my_chat_member:z.object({chat:privateChat,new_chat_member:z.object({status:z.string()})}).optional()});
-export async function processUpdates(){const sql=postgres(setting('DATABASE_WORKER_URL'),{prepare:false,max:1,ssl:process.env.DATABASE_SSL==='false'?false:'require'});let processed=0;
+export async function processUpdates(){const sql=postgres(setting('DATABASE_WORKER_URL'),{prepare:false,max:1,ssl:process.env.DATABASE_SSL==='false'?false:{rejectUnauthorized:true}});let processed=0;
  try{const jobs=await sql`SELECT bot_id,update_id,payload_ciphertext,lease::text AS lease FROM app.claim_telegram_updates(20)`;
  for(const job of jobs){let success=false;try{
   const parsed=update.safeParse(JSON.parse(decrypt(job.payload_ciphertext)));

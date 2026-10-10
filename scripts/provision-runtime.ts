@@ -6,7 +6,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile,writeFile } from 'node:fs/promises';
 loadEnvConfig(process.cwd());
 const admin=process.env.DATABASE_ADMIN_URL;if(!admin)throw new Error('DATABASE_ADMIN_URL required');
-const sql=postgres(admin,{max:1,prepare:false,ssl:process.env.DATABASE_SSL==='false'?false:'require'});
+const sql=postgres(admin,{max:1,prepare:false,ssl:process.env.DATABASE_SSL==='false'?false:{rejectUnauthorized:true}});
 let env=await readFile('.env.local','utf8');
 function set(name:string,value:string){const rx=new RegExp('^'+name+'=.*$','m');env=rx.test(env)?env.replace(rx,name+'='+value):env+'\n'+name+'='+value+'\n';}
 try{

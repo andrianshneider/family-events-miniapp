@@ -21,15 +21,21 @@ it("validates JWT identity mapping, nonce, audience and replay transaction", asy
   const { privateKey, publicKey } = await generateKeyPair("RS256");
   const jwk = await exportJWK(publicKey);
   jwk.kid = "test";
-  async function jwt(claims: Record<string, unknown>, aud = "123") {
+  async function jwt(
+    claims: Record<string, unknown>,
+    aud = "123",
+    tokenIssuer = "https://oauth.telegram.org",
+    expires: string | number = "5m",
+    key = privateKey,
+  ) {
     return new SignJWT(claims)
       .setProtectedHeader({ alg: "RS256", kid: "test" })
-      .setIssuer("https://oauth.telegram.org")
+      .setIssuer(tokenIssuer)
       .setAudience(aud)
       .setSubject("different-oidc-sub")
       .setIssuedAt()
-      .setExpirationTime("5m")
-      .sign(privateKey);
+      .setExpirationTime(expires)
+      .sign(key);
   }
   let token = await jwt({ id: 123456, name: "Иван", nonce: "valid-nonce" });
   vi.stubGlobal(
@@ -67,6 +73,36 @@ it("validates JWT identity mapping, nonce, audience and replay transaction", asy
     "other-client",
   );
   await expect(finishOidc("code", state)).rejects.toThrow();
+  token = await jwt(
+    { id: 123456, name: "Иван", nonce: "valid-nonce" },
+    "123",
+    "https://invalid.test",
+  );
+  await expect(finishOidc("code", state)).rejects.toThrow();
+  token = await jwt(
+    { id: 123456, name: "Иван", nonce: "valid-nonce" },
+    "123",
+    "https://oauth.telegram.org",
+    Math.floor(Date.now() / 1000) - 1,
+  );
+  await expect(finishOidc("code", state)).rejects.toThrow();
+  const wrongKey = await generateKeyPair("RS256");
+  token = await jwt(
+    { id: 123456, name: "Иван", nonce: "valid-nonce" },
+    "123",
+    "https://oauth.telegram.org",
+    "5m",
+    wrongKey.privateKey,
+  );
+  await expect(finishOidc("code", state)).rejects.toThrow();
+  runQuery.mockClear();
+  setCookie.mockReturnValue({ value: "b".repeat(43) });
+  await expect(finishOidc("code", state)).rejects.toThrow();
+  expect(runQuery).not.toHaveBeenCalled();
+  setCookie.mockReturnValue(undefined);
+  await expect(finishOidc("code", state)).rejects.toThrow();
+  expect(runQuery).not.toHaveBeenCalled();
+  setCookie.mockReturnValue({ value: state });
   runQuery.mockResolvedValue([]);
   await expect(finishOidc("code", state)).rejects.toThrow();
   vi.unstubAllGlobals();

@@ -18,3 +18,9 @@ Source of truth: Technical Specification v1.0, 10 October 2026.
 ## Working organizer screens
 
 The root now redirects to session-protected `/events`; unauthenticated visitors reach `/login`. The old `/01-telegram-login.html` and `/02-my-events.html` URLs redirect to working screens. Browser login uses OIDC; Telegram Mini App login posts signed initData to the existing verifier. The screen checks `/api/v1/me`, loads an owner-filtered, non-deleted projection from `/api/v1/events` (latest 100, with truncation notice), and logs out using CSRF protection. Loading/error/retry and real empty states replace demo controls. Event creation and detail editing are separate slices and are not exposed as fake working controls.
+
+## Vertical Slice 01 — 10 October 2026
+
+Implementation is published in `infrastructure-foundation` (`7cbbe52`) and staging Preview; CI and deployment passed. Migration 005 adds hash-only Mini App replay protection. Organizer events now support cursor pagination, and resuming the app rechecks the session. OIDC cancellation/failure returns to the Russian login screen. Both remote staging smoke scripts passed; temporary fixtures were removed. No main merge or production publication occurred.
+
+Full acceptance remains pending real Telegram/Safari and installed iPhone PWA sign-in and callback return. See [verification report](01-organizer-auth-verification.md).

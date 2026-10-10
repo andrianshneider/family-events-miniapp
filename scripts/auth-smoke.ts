@@ -81,6 +81,25 @@ try {
   });
   assert.equal(profile.status, 200);
   assert.equal((await profile.json()).data.id, userId);
+  const publicEvents = await fetch(root + "/api/v1/events");
+  assert.equal(publicEvents.status, 401);
+  const list = () =>
+    fetch(root + "/api/v1/events", { headers: { Cookie: orgCookie } });
+  assert.equal((await (await list()).json()).data.events.length, 0);
+  const [fixture] =
+    await sql`INSERT INTO app.events(organizer_id,public_id,title,event_type,event_date,timezone,effective_at) VALUES(${userId!},${randomBytes(16).toString("base64url")},'Infrastructure event smoke','family','2027-01-01','UTC','2027-01-01T00:00Z') RETURNING id`;
+  const items = (await (await list()).json()).data.events;
+  assert.deepEqual(
+    items.map((e: { id: string }) => e.id),
+    [fixture.id],
+  );
+  await sql`UPDATE app.events SET deleted_at=now() WHERE id=${fixture.id} AND organizer_id=${userId!}`;
+  assert.equal((await (await list()).json()).data.events.length, 0);
+  const screen = await fetch(root + "/events", {
+    headers: { Cookie: orgCookie },
+  });
+  assert.equal(screen.status, 200);
+  assert((await screen.text()).includes("Мои события"));
   const csrf = await fetch(root + "/api/auth/csrf", {
     headers: { Cookie: orgCookie },
   });
@@ -126,6 +145,7 @@ try {
     const [owned] =
       await tx`SELECT id FROM app.users WHERE telegram_user_id=${tid} AND display_name='Infrastructure smoke' AND created_at>=${startedAt}`;
     if (owned) {
+      await tx`DELETE FROM app.events WHERE organizer_id=${owned.id}`;
       await tx`DELETE FROM app.organizer_sessions WHERE user_id=${owned.id}`;
       await tx`DELETE FROM app.users WHERE id=${owned.id}`;
     }

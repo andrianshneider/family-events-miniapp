@@ -14,3 +14,7 @@ Source of truth: Technical Specification v1.0, 10 October 2026.
 - Server and worker LOGIN roles have been provisioned with user authorization and separate random passwords.
 - Remaining external setup: Telegram staging bot/OIDC credentials and Allowed URLs; then import those four variables into Vercel Preview and verify auth endpoints/webhook. Supabase, restricted DB connections, Storage and GitHub → Vercel are verified.
 - Notification dispatch endpoint is implemented but scheduling is not enabled. Hobby Vercel cron is not suitable for a 60-second cadence; select an authorized scheduler or Supabase pg_cron+pg_net, storing its secret in Vault, when notifications are activated.
+
+## Working organizer screens
+
+The root now redirects to session-protected `/events`; unauthenticated visitors reach `/login`. The old `/01-telegram-login.html` and `/02-my-events.html` URLs redirect to working screens. Browser login uses OIDC; Telegram Mini App login posts signed initData to the existing verifier. The screen checks `/api/v1/me`, loads an owner-filtered, non-deleted projection from `/api/v1/events` (latest 100, with truncation notice), and logs out using CSRF protection. Loading/error/retry and real empty states replace demo controls. Event creation and detail editing are separate slices and are not exposed as fake working controls.

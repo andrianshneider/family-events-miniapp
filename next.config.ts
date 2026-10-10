@@ -2,6 +2,20 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   poweredByHeader: false,
   outputFileTracingIncludes: { "/*": ["./certs/*.crt"] },
+  async redirects() {
+    return [
+      {
+        source: "/01-telegram-login.html",
+        destination: "/login",
+        permanent: false,
+      },
+      {
+        source: "/02-my-events.html",
+        destination: "/events",
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

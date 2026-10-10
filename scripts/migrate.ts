@@ -1,5 +1,6 @@
 import postgres from 'postgres';
-import { loadEnvConfig } from '@next/env';
+import nextEnv from '@next/env';
+const {loadEnvConfig}=nextEnv;
 import { migrate } from './migrations';
 loadEnvConfig(process.cwd());
 if(!process.env.DATABASE_ADMIN_URL)throw new Error('DATABASE_ADMIN_URL required');

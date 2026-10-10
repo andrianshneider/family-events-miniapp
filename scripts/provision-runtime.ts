@@ -1,5 +1,6 @@
 // Run only with the migration administrator. No credential is printed.
-import { loadEnvConfig } from '@next/env';
+import nextEnv from '@next/env';
+const {loadEnvConfig}=nextEnv;
 import postgres from 'postgres';
 import { randomBytes } from 'node:crypto';
 import { readFile,writeFile } from 'node:fs/promises';

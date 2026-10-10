@@ -1,5 +1,6 @@
 // Explicit setup command, not called automatically in build or tests.
-import { loadEnvConfig } from '@next/env';
+import nextEnv from '@next/env';
+const {loadEnvConfig}=nextEnv;
 loadEnvConfig(process.cwd());
 const token=process.env.TELEGRAM_BOT_TOKEN,url=process.env.APP_URL,secret=process.env.TELEGRAM_WEBHOOK_SECRET;
 if(!token||!url?.startsWith('https://')||!secret)throw new Error('HTTPS APP_URL and Telegram configuration required');

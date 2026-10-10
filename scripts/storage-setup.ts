@@ -1,4 +1,5 @@
-import { loadEnvConfig } from '@next/env';
+import nextEnv from '@next/env';
+const {loadEnvConfig}=nextEnv;
 import { createClient } from '@supabase/supabase-js';
 loadEnvConfig(process.cwd());
 if(!process.env.SUPABASE_URL||!process.env.SUPABASE_SERVICE_ROLE_KEY)throw new Error('Server Storage configuration required');

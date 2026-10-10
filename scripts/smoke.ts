@@ -1,4 +1,5 @@
-import { loadEnvConfig } from '@next/env';
+import nextEnv from '@next/env';
+const {loadEnvConfig}=nextEnv;
 import assert from 'node:assert/strict';
 loadEnvConfig(process.cwd());
 const url=process.env.SMOKE_URL??process.env.APP_URL;if(!url)throw new Error('APP_URL/SMOKE_URL required');

@@ -5,10 +5,10 @@ import { useState } from "react";
 type TelegramWindow = Window & {
   Telegram?: { WebApp?: { initData?: string; ready(): void; expand(): void } };
 };
-export function LoginScreen() {
+export function LoginScreen({ initialError = "" }: { initialError?: string }) {
   const [pending, setPending] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   async function signIn() {
     setPending(true);
     setError("");

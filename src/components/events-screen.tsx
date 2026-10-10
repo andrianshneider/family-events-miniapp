@@ -9,12 +9,14 @@ type EventItem = {
   timezone: string;
   venueName: string | null;
 };
-type Loaded = { name: string; events: EventItem[]; hasMore: boolean };
+type Loaded = { name: string; events: EventItem[]; nextCursor: string | null };
 export function EventsScreen() {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [moreError, setMoreError] = useState("");
   const load = useCallback(async () => {
     try {
       const me = await fetch("/api/v1/me", { cache: "no-store" });
@@ -36,7 +38,7 @@ export function EventsScreen() {
       setData({
         name: profile.data.displayName,
         events: result.data.events,
-        hasMore: result.data.hasMore,
+        nextCursor: result.data.nextCursor,
       });
     } catch (e) {
       setError(
@@ -46,10 +48,66 @@ export function EventsScreen() {
       setPending(false);
     }
   }, []);
+  async function loadMore() {
+    if (!data?.nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    setMoreError("");
+    try {
+      const response = await fetch(
+        "/api/v1/events?cursor=" + encodeURIComponent(data.nextCursor),
+        { cache: "no-store" },
+      );
+      if (response.status === 401) {
+        window.location.replace("/login");
+        return;
+      }
+      if (!response.ok)
+        throw Error(
+          "Не удалось загрузить остальные события. Повторите попытку.",
+        );
+      const result = await response.json();
+      setData(
+        (current) =>
+          current && {
+            ...current,
+            events: [
+              ...current.events,
+              ...result.data.events.filter(
+                (event: EventItem) =>
+                  !current.events.some((existing) => existing.id === event.id),
+              ),
+            ],
+            nextCursor: result.data.nextCursor,
+          },
+      );
+    } catch (e) {
+      setMoreError(
+        e instanceof Error ? e.message : "Не удалось загрузить события.",
+      );
+    } finally {
+      setLoadingMore(false);
+    }
+  }
   useEffect(() => {
     // The effect starts an asynchronous session/API request; updates follow its result.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    const restore = () => {
+      if (document.visibilityState !== "visible") return;
+      setPending(true);
+      setError("");
+      setMoreError("");
+      void load();
+    };
+    const show = (event: PageTransitionEvent) => {
+      if (event.persisted) restore();
+    };
+    document.addEventListener("visibilitychange", restore);
+    window.addEventListener("pageshow", show);
+    return () => {
+      document.removeEventListener("visibilitychange", restore);
+      window.removeEventListener("pageshow", show);
+    };
   }, [load]);
   async function logout() {
     setLoggingOut(true);
@@ -128,8 +186,23 @@ export function EventsScreen() {
                 </li>
               ))}
             </ul>
-            {data.hasMore && (
-              <p className="muted">Показаны последние 100 событий.</p>
+            {moreError && (
+              <p role="alert" className="error">
+                {moreError}
+              </p>
+            )}
+            {data.nextCursor && (
+              <button
+                className="secondary"
+                onClick={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore
+                  ? "Загружаем…"
+                  : moreError
+                    ? "Повторить загрузку"
+                    : "Показать ещё"}
+              </button>
             )}
           </>
         ) : (
@@ -143,9 +216,11 @@ export function EventsScreen() {
       {data && !pending && (
         <button
           className="secondary refresh"
+          disabled={loadingMore}
           onClick={() => {
             setPending(true);
             setError("");
+            setMoreError("");
             void load();
           }}
         >

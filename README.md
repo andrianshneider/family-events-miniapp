@@ -65,7 +65,9 @@ Migrations:
 3. `202610100003_webhook_worker.sql`: encrypted inbox leasing and channel updates, no implicit event opt-in.
 4. `202610100004_subscription_guard.sql`: enabled subscriptions require an active event and verified ready Telegram channel.
 
-Runtime fe_server is a trusted BFF group with explicit table policies and DML grants, no schema creation or superuser rights. It can read business rows, so each DAL/service operation must enforce resource authorization. Browser roles have neither schema/table grants nor policies. Worker has no table grants and can invoke only named SECURITY DEFINER functions with fixed search_path. Application schema must remain absent from hosted Data API exposed schemas.
+Runtime fe_server is a trusted BFF group with explicit table policies and DML grants, no schema creation or superuser rights. It can read business rows, so each DAL/service operation must enforce resource authorization. Browser roles have neither schema/table grants nor policies. Official Supabase root CA is bundled from its dashboard download source; database TLS verifies both certificate and hostname.
+
+Worker has no table grants and can invoke only named SECURITY DEFINER functions with fixed search_path. Application schema must remain absent from hosted Data API exposed schemas.
 
 `node --conditions=react-server --import tsx scripts/live-dal-smoke.ts` checks the actual runtime role, hashed session, cross-owner access and idempotency with rollback.
 
@@ -143,4 +145,4 @@ node --import tsx scripts/security-bundle.ts
 SMOKE_URL=https://YOUR-STAGING-URL pnpm smoke
 ```
 
-Read [infrastructure-status.md](docs/infrastructure-status.md) for observed resources and unresolved external setup. Alpha also requires live concurrency tests against PostgreSQL/pooler, full Surprise privacy tests, real Telegram cross-platform login/delivery, orphan reconciliation, retention/purge jobs, backup/restore rehearsal and the remaining product slices. Foundation tests do not claim those scenarios complete.
+Read [infrastructure-status.md](docs/infrastructure-status.md) for observed resources and unresolved external setup. Live concurrency and role isolation checks have passed against the staging pooler. Alpha still requires full Surprise privacy tests, real Telegram cross-platform login/delivery, orphan reconciliation, retention/purge jobs, backup/restore rehearsal and the remaining product slices. Foundation tests do not claim those scenarios complete.

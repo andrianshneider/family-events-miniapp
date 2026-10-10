@@ -17,4 +17,6 @@ Known existing resources:
 9. Register webhook and Mini App URL after staging is verified. Actual login on Telegram/Web/PWA is a separate live check; synthetic payload tests do not prove account mapping in a real browser session.
 10. Leave production unchanged; review PR before merge. Production data/secrets must be separate.
 
+Remote staging smoke has passed (health, authentication boundary, DB/schema, Storage, DAL). Actual parallel reservation and worker isolation checks passed; latest CI on 9fb4dd8 is green.
+
 Current agent browser access was stopped because the admin-enforced browser security policy could not be verified. Do not bypass it with cookie extraction or hidden APIs. User may complete dashboard configuration directly until browser access is restored.

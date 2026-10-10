@@ -1,7 +1,7 @@
 "use client";
 import { InstallHelp } from "./install-help";
 import Script from "next/script";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 type TelegramWindow = Window & {
   Telegram?: {
     WebApp?: {
@@ -17,6 +17,38 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState(initialError);
   const [restart, setRestart] = useState(false);
+  const [miniLaunch, setMiniLaunch] = useState(false);
+  useEffect(() => {
+    // This is only SDK loading detection; identity is always established by the server.
+    const mini =
+      new URLSearchParams(window.location.hash.slice(1)).has("tgWebAppData") ||
+      !!(window as TelegramWindow).Telegram?.WebApp?.initData;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMiniLaunch(mini);
+    const restore = async () => {
+      if (document.visibilityState !== "visible") return;
+      setPending(false);
+      try {
+        const response = await fetch("/api/v1/me", {
+          cache: "no-store",
+          credentials: "same-origin",
+          signal: AbortSignal.timeout(10000),
+        });
+        if (response.ok) window.location.replace("/events");
+      } catch {
+        // A failed connectivity check must leave the login action available.
+      }
+    };
+    const show = (event: PageTransitionEvent) => {
+      if (event.persisted) void restore();
+    };
+    document.addEventListener("visibilitychange", restore);
+    window.addEventListener("pageshow", show);
+    return () => {
+      document.removeEventListener("visibilitychange", restore);
+      window.removeEventListener("pageshow", show);
+    };
+  }, []);
   async function signIn() {
     setPending(true);
     setError("");
@@ -81,13 +113,26 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
         Планируйте семейные праздники и встречи. Войдите через Telegram, чтобы
         открыть свои события.
       </p>
-      <button
+      <a
         className="primary"
-        onClick={signIn}
-        disabled={pending || !sdkReady}
+        href="/api/auth/telegram/start?returnTo=/events"
+        aria-disabled={pending || (miniLaunch && !sdkReady)}
+        onClick={(event) => {
+          if (pending || (miniLaunch && !sdkReady)) {
+            event.preventDefault();
+            return;
+          }
+          if (
+            (window as TelegramWindow).Telegram?.WebApp?.initData ||
+            miniLaunch
+          ) {
+            event.preventDefault();
+            void signIn();
+          }
+        }}
       >
         {pending ? "Входим…" : "Войти через Telegram"}
-      </button>
+      </a>
       {error && (
         <p role="alert" className="error">
           {error}

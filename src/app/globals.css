@@ -76,11 +76,18 @@ p {
   min-height: 48px;
 }
 .primary {
+  display: block;
+  text-align: center;
+  text-decoration: none;
   background: #7e50c5;
   color: white;
   border: 0;
   font-weight: 700;
   margin: 24px 0 8px;
+}
+.primary[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: wait;
 }
 .secondary {
   background: white;

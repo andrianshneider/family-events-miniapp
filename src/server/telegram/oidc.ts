@@ -10,7 +10,9 @@ import type { VerifiedTelegramUser } from "./init-data";
 const issuer = "https://oauth.telegram.org";
 const keys = createRemoteJWKSet(new URL(issuer + "/.well-known/jwks.json"));
 export function returnPath(value: string | null) {
-  return value === "/events" || value === "/" ? value : "/events";
+  return value === "/events" || value === "/" || value === "/events/new"
+    ? value
+    : "/events";
 }
 export async function startOidc(path: string) {
   const state = token(),

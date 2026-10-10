@@ -1,6 +1,8 @@
 "use client";
 import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { readEventForm } from "@/lib/event-form-state";
 type EventItem = {
   id: string;
   title: string;
@@ -9,7 +11,12 @@ type EventItem = {
   timezone: string;
   venueName: string | null;
 };
-type Loaded = { name: string; events: EventItem[]; nextCursor: string | null };
+type Loaded = {
+  name: string;
+  events: EventItem[];
+  nextCursor: string | null;
+  resumeDraft: boolean;
+};
 export function EventsScreen() {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
@@ -35,10 +42,20 @@ export function EventsScreen() {
       if (!response.ok)
         throw Error("Не удалось загрузить события. Повторите попытку.");
       const result = await response.json();
+      let resumeDraft = false;
+      try {
+        const raw = localStorage.getItem("fe-create-event-form-v1");
+        resumeDraft = !!readEventForm(raw, profile.data.id);
+        if (raw && !resumeDraft)
+          localStorage.removeItem("fe-create-event-form-v1");
+      } catch {
+        /* Temporary form storage is optional; the server remains authoritative. */
+      }
       setData({
         name: profile.data.displayName,
         events: result.data.events,
         nextCursor: result.data.nextCursor,
+        resumeDraft,
       });
     } catch (e) {
       setError(
@@ -142,6 +159,9 @@ export function EventsScreen() {
         </button>
       </header>
       <h1>Мои события</h1>
+      <Link href="/events/new" className="primary">
+        {data?.resumeDraft ? "Продолжить создание" : "＋ Создать событие"}
+      </Link>
       {data && (
         <p className="muted">{data.name}, здесь ваши праздники и встречи.</p>
       )}
@@ -169,20 +189,22 @@ export function EventsScreen() {
             <ul className="event-list">
               {data.events.map((e) => (
                 <li className="card" key={e.id}>
-                  <h2>{e.title}</h2>
-                  <p>
-                    {new Intl.DateTimeFormat("ru-RU", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      timeZone: "UTC",
-                    }).format(new Date(e.eventDate + "T12:00:00Z"))}
-                    {e.startTime ? " · " + e.startTime.slice(0, 5) : ""}
-                  </p>
-                  {e.startTime && (
-                    <p className="small muted">Часовой пояс: {e.timezone}</p>
-                  )}
-                  {e.venueName && <p className="muted">{e.venueName}</p>}
+                  <Link href={`/events/${e.id}`} className="event-card-link">
+                    <h2>{e.title}</h2>
+                    <p>
+                      {new Intl.DateTimeFormat("ru-RU", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      }).format(new Date(e.eventDate + "T12:00:00Z"))}
+                      {e.startTime ? " · " + e.startTime.slice(0, 5) : ""}
+                    </p>
+                    {e.startTime && (
+                      <p className="small muted">Часовой пояс: {e.timezone}</p>
+                    )}
+                    {e.venueName && <p className="muted">{e.venueName}</p>}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -211,6 +233,9 @@ export function EventsScreen() {
             <p className="muted">
               Здесь появятся ваши семейные праздники и встречи.
             </p>
+            <Link href="/events/new" className="secondary">
+              Создать первое событие
+            </Link>
           </section>
         ))}
       {data && !pending && (

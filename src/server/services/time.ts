@@ -30,11 +30,24 @@ export function eventTimes(
       now.toZonedDateTimeISO(timezone).toPlainDate(),
     ) < 0
   )
-    throw new AppError(422, "EVENT_DATE_IN_PAST", "Дата события уже прошла.");
-  const effectiveAt = localInstant(date, start ?? "00:00", timezone);
+    throw new AppError(422, "EVENT_DATE_IN_PAST", "Дата события уже прошла.", {
+      eventDate: [
+        "Выберите сегодняшнюю или будущую дату в часовом поясе события.",
+      ],
+    });
+  const at = (time: string, field: string) => {
+    try {
+      return localInstant(date, time, timezone);
+    } catch (error) {
+      if (error instanceof AppError)
+        error.fieldErrors = { [field]: [error.message] };
+      throw error;
+    }
+  };
+  const effectiveAt = at(start ?? "00:00", start ? "startTime" : "eventDate");
   return {
     startsAt: start ? effectiveAt : null,
-    endsAt: end ? localInstant(date, end, timezone) : null,
+    endsAt: end ? at(end, "endTime") : null,
     effectiveAt,
   };
 }

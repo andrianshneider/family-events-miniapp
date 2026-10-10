@@ -12,7 +12,13 @@ type TelegramWindow = Window & {
     };
   };
 };
-export function LoginScreen({ initialError = "" }: { initialError?: string }) {
+export function LoginScreen({
+  initialError = "",
+  returnTo = "/events",
+}: {
+  initialError?: string;
+  returnTo?: string;
+}) {
   const [pending, setPending] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState(initialError);
@@ -34,7 +40,7 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
           credentials: "same-origin",
           signal: AbortSignal.timeout(10000),
         });
-        if (response.ok) window.location.replace("/events");
+        if (response.ok) window.location.replace(returnTo);
       } catch {
         // A failed connectivity check must leave the login action available.
       }
@@ -48,7 +54,7 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
       document.removeEventListener("visibilitychange", restore);
       window.removeEventListener("pageshow", show);
     };
-  }, []);
+  }, [returnTo]);
   async function signIn() {
     setPending(true);
     setError("");
@@ -57,7 +63,7 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
     if (!app?.initData) {
       window.location.assign(
         new URL(
-          "/api/auth/telegram/start?returnTo=/events",
+          "/api/auth/telegram/start?returnTo=" + encodeURIComponent(returnTo),
           window.location.origin,
         ).href,
       );
@@ -86,7 +92,7 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
           result.error?.message ?? "Не удалось войти. Повторите попытку.",
         );
       }
-      window.location.replace("/events");
+      window.location.replace(returnTo);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось войти.");
       setPending(false);
@@ -115,7 +121,9 @@ export function LoginScreen({ initialError = "" }: { initialError?: string }) {
       </p>
       <a
         className="primary"
-        href="/api/auth/telegram/start?returnTo=/events"
+        href={
+          "/api/auth/telegram/start?returnTo=" + encodeURIComponent(returnTo)
+        }
         aria-disabled={pending || (miniLaunch && !sdkReady)}
         onClick={(event) => {
           if (pending || (miniLaunch && !sdkReady)) {

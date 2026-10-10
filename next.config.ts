@@ -5,6 +5,16 @@ const config: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/03-create-event.html",
+        destination: "/events/new",
+        permanent: false,
+      },
+      {
+        source: "/04-event-management.html",
+        destination: "/events",
+        permanent: false,
+      },
+      {
         source: "/01-telegram-login.html",
         destination: "/login",
         permanent: false,

@@ -533,6 +533,10 @@ a:focus-visible {
   flex: 1;
 }
 .event-more {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  line-height: 1;
   width: 52px;
   flex: 0 0 52px;
   margin: 0;

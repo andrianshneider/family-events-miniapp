@@ -166,7 +166,18 @@ export function EventActions({
           aria-haspopup="dialog"
           onClick={open}
         >
-          •••
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <circle cx="4" cy="12" r="2.5" />
+            <circle cx="12" cy="12" r="2.5" />
+            <circle cx="20" cy="12" r="2.5" />
+          </svg>
         </button>
       </div>
       {offline && (

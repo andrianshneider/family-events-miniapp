@@ -1,4 +1,5 @@
 "use client";
+import { watchEventChanges } from "@/lib/event-updates";
 import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
@@ -23,7 +24,13 @@ type Loaded = {
 type Initial = EventList & {
   profile: { id: string; displayName: string; avatarUrl: string | null };
 };
-export function EventsScreen({ initial }: { initial: Initial }) {
+export function EventsScreen({
+  initial,
+  deleted = false,
+}: {
+  initial: Initial;
+  deleted?: boolean;
+}) {
   const [data, setData] = useState<Loaded>({
     name: initial.profile.displayName,
     events: initial.events,
@@ -156,10 +163,18 @@ export function EventsScreen({ initial }: { initial: Initial }) {
     }, 90000);
     document.addEventListener("visibilitychange", restore);
     window.addEventListener("pageshow", show);
+    window.addEventListener("online", restore);
+    const stopWatching = watchEventChanges(() => {
+      if (document.visibilityState !== "visible") return;
+      if (flight.current) void flight.current.then(() => load());
+      else void load();
+    });
     return () => {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", restore);
       window.removeEventListener("pageshow", show);
+      window.removeEventListener("online", restore);
+      stopWatching();
     };
   }, [load, initial.profile.id]);
   async function logout() {
@@ -195,6 +210,11 @@ export function EventsScreen({ initial }: { initial: Initial }) {
         </button>
       </header>
       <h1>Мои события</h1>
+      {deleted && (
+        <p className="notice success" role="status">
+          Событие удалено
+        </p>
+      )}
       <Link href="/events/new" className="primary">
         {data?.resumeDraft ? "Продолжить создание" : "＋ Создать событие"}
       </Link>

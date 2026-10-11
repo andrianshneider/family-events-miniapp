@@ -1,4 +1,5 @@
 "use client";
+import { announceEventChange, watchEventChanges } from "@/lib/event-updates";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -120,6 +121,7 @@ export function CreateEventScreen({
   const [pending, setPending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [unavailable, setUnavailable] = useState(false);
   const [coverError, setCoverError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const form = useRef<HTMLFormElement>(null);
@@ -173,8 +175,16 @@ export function CreateEventScreen({
     heading.current?.focus();
     setOnline(navigator.onLine);
     const network = () => setOnline(navigator.onLine);
+    let restoring = false;
     const restore = async () => {
-      if (document.visibilityState !== "visible") return;
+      if (
+        document.visibilityState !== "visible" ||
+        restoring ||
+        busy.current ||
+        uploadBusy.current
+      )
+        return;
+      restoring = true;
       try {
         const response = await fetch("/api/v1/me", {
           cache: "no-store",
@@ -190,18 +200,54 @@ export function CreateEventScreen({
           removeSaved();
           allowExit.current = true;
           window.location.replace("/events");
+        } else if (response.ok && editing) {
+          const current = await fetch(`/api/v1/events/${editing.id}`, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(10000),
+          });
+          if (current.status === 404) {
+            removeSaved();
+            allowExit.current = true;
+            setUnavailable(true);
+          } else if (current.status === 401) {
+            persist(fieldsRef.current, attemptRef.current);
+            allowExit.current = true;
+            window.location.replace(loginPath);
+          } else if (
+            current.ok &&
+            (await current.json()).data.version !== editing.version
+          ) {
+            setError(
+              "Событие изменилось в другой вкладке. Ваш ввод сохранён; загрузите актуальную версию перед сохранением.",
+            );
+          }
         }
       } catch {
         /* Offline editing remains available; mutations recheck the session. */
+      } finally {
+        restoring = false;
       }
     };
     window.addEventListener("online", network);
     window.addEventListener("offline", network);
     document.addEventListener("visibilitychange", restore);
+    const show = (event: PageTransitionEvent) => {
+      if (event.persisted) void restore();
+    };
+    window.addEventListener("pageshow", show);
+    window.addEventListener("online", restore);
+    const stopWatching = watchEventChanges(() => void restore());
+    const interval = editing
+      ? window.setInterval(() => void restore(), 30000)
+      : null;
     return () => {
       window.removeEventListener("online", network);
       window.removeEventListener("offline", network);
       document.removeEventListener("visibilitychange", restore);
+      window.removeEventListener("pageshow", show);
+      window.removeEventListener("online", restore);
+      if (interval) window.clearInterval(interval);
+      stopWatching();
     };
   }, [userId, persist, editing, loginPath, removeSaved, storageKey]);
   const dirty = Object.entries(fields).some(([key, value]) =>
@@ -410,6 +456,12 @@ export function CreateEventScreen({
         return;
       }
       if (!response.ok) {
+        if (editing && response.status === 404) {
+          removeSaved();
+          allowExit.current = true;
+          setUnavailable(true);
+          return;
+        }
         if (
           [403, 404, 422, 429].includes(response.status) ||
           (editing &&
@@ -436,6 +488,7 @@ export function CreateEventScreen({
       }
       removeSaved();
       allowExit.current = true;
+      announceEventChange();
       window.location.replace(
         `/events/${result.data.id}?${editing ? "updated" : "created"}=1`,
       );
@@ -450,6 +503,16 @@ export function CreateEventScreen({
       setPending(false);
     }
   }
+  if (unavailable)
+    return (
+      <main className="shell">
+        <h1>Событие недоступно</h1>
+        <p>Оно удалено или у вас нет доступа.</p>
+        <button className="secondary" onClick={() => router.push("/events")}>
+          Мои события
+        </button>
+      </main>
+    );
   const locked = pending || !!attempt;
   const cover = fields.coverAssetId
     ? `/api/v1/media/${fields.coverAssetId}`

@@ -44,6 +44,7 @@ import { POST as create, GET as list } from "@/app/api/v1/events/route";
 import {
   GET as detail,
   PATCH as update,
+  DELETE as remove,
 } from "@/app/api/v1/events/[eventId]/route";
 import EditPage from "@/app/events/[eventId]/edit/page";
 import EventPage from "@/app/events/[eventId]/page";
@@ -65,7 +66,12 @@ it("creates real events atomically and enforces validation, idempotency and owne
           (text, part, index) => text + (index ? "$" + index : "") + part,
           "",
         );
-        return (await client.query(sql, values)).rows;
+        return (
+          await client.query<Record<string, string | number | boolean | null>>(
+            sql,
+            values,
+          )
+        ).rows;
       },
       { json: (value: unknown) => JSON.stringify(value) },
     );
@@ -165,6 +171,30 @@ it("creates real events atomically and enforces validation, idempotency and owne
             : {}),
         },
         body: JSON.stringify({ fields, expectedVersion }),
+      }),
+      { params: Promise.resolve({ eventId: id }) },
+    );
+  const del = (
+    id: string,
+    expectedVersion = 4,
+    key = "key-delete-event-001",
+    withCsrf = true,
+    extra = {},
+  ) =>
+    remove(
+      new Request("https://example.test/api/v1/events/" + id, {
+        method: "DELETE",
+        headers: {
+          Origin: "https://example.test",
+          "Content-Type": "application/json",
+          "idempotency-key": key,
+          ...(withCsrf
+            ? {
+                "x-csrf-token": csrf(bridge.cookies.get("__Host-fe_org") ?? ""),
+              }
+            : {}),
+        },
+        body: JSON.stringify({ expectedVersion, ...extra }),
       }),
       { params: Promise.resolve({ eventId: id }) },
     );
@@ -461,6 +491,143 @@ it("creates real events atomically and enforces validation, idempotency and owne
     await pg.exec(
       "RESET ROLE; DROP TRIGGER test_change_failure ON app.event_changes; DROP FUNCTION app.test_fail_change(); SET ROLE fe_server;",
     );
+    // Non-significant edits and normalized whitespace must not create audit snapshots.
+    const existing = (await (await get(second.id)).json()).data;
+    await query`UPDATE app.events SET venue_name='  Дом  ',address='  Москва  ' WHERE id=${second.id}`;
+    const [countBefore] =
+      await query`SELECT count(*)::int AS count FROM app.event_changes WHERE event_id=${second.id}`;
+    const nonSignificant = {
+      ...full,
+      title: "Только название",
+      venueName: "  Дом  ",
+      description: "Описание",
+      dressCode: "Белое",
+    };
+    expect(
+      (
+        await patch(
+          second.id,
+          nonSignificant,
+          existing.version,
+          "key-title-only-00001",
+        )
+      ).status,
+    ).toBe(200);
+    const [countAfter] =
+      await query`SELECT count(*)::int AS count FROM app.event_changes WHERE event_id=${second.id}`;
+    expect(countAfter.count).toBe(countBefore.count);
+    const [guest] =
+      await query`INSERT INTO app.guest_identities(display_name) VALUES('Гость') RETURNING id`;
+    const [wishlist] =
+      await query`SELECT id FROM app.wishlists WHERE event_id=${second.id}`;
+    const [gift] =
+      await query`INSERT INTO app.gifts(wishlist_id,title) VALUES(${wishlist.id},'Подарок') RETURNING id`;
+    const [publicEvent] =
+      await query`SELECT public_id FROM app.events WHERE id=${second.id}`;
+    await query`SELECT * FROM app.reserve_gift(${publicEvent.public_id},${gift.id},${guest.id})`;
+    await query`INSERT INTO app.rsvps(event_id,guest_identity_id,guest_name,status,adults_count,children_count) VALUES(${second.id},${guest.id},'Гость','yes',2,1)`;
+    await query`INSERT INTO app.telegram_channels(user_id,chat_id,permission_granted_at,permission_source,delivery_state) VALUES(${owner.id},101,now(),'bot_start','ready')`;
+    const [sub] =
+      await query`INSERT INTO app.notification_subscriptions(event_id,user_id,role,enabled,consented_at) VALUES(${second.id},${owner.id},'organizer',true,now()) RETURNING id`;
+    await query`INSERT INTO app.notifications(subscription_id,type,trigger_key,payload,scheduled_at,next_attempt_at) VALUES(${sub.id},'rsvp_new','test-delete','{}',now(),now())`;
+    expect((await (await get(second.id)).json()).data.responses).toMatchObject({
+      yes: 1,
+      adults: 2,
+      children: 1,
+    });
+    expect(
+      (await del(second.id, 5, "key-delete-nocsrf-01", false)).status,
+    ).toBe(403);
+    expect(
+      (
+        await del(second.id, 5, "key-delete-forged-01", true, {
+          organizerId: other.id,
+        })
+      ).status,
+    ).toBe(422);
+    expect((await del(second.id, 4, "key-delete-stale-001")).status).toBe(409);
+    bridge.cookies.set("__Host-fe_org", other.raw);
+    expect((await del(second.id, 5)).status).toBe(404);
+    bridge.cookies.set("__Host-fe_org", owner.raw);
+    // A child failure rolls back the event, reservation and operation receipt together.
+    await pg.exec(
+      "RESET ROLE; CREATE FUNCTION app.test_fail_delete() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$; CREATE TRIGGER test_delete_failure BEFORE UPDATE ON app.notifications FOR EACH ROW EXECUTE FUNCTION app.test_fail_delete(); SET ROLE fe_server;",
+    );
+    expect((await del(second.id, 5, "key-delete-rollback1")).status).toBe(500);
+    expect((await get(second.id)).status).toBe(200);
+    expect(
+      (
+        await query`SELECT status FROM app.gift_reservations WHERE gift_id=${gift.id}`
+      )[0].status,
+    ).toBe("active");
+    expect(
+      await query`SELECT id FROM app.api_idempotency WHERE key='key-delete-rollback1'`,
+    ).toHaveLength(0);
+    await pg.exec(
+      "RESET ROLE; DROP TRIGGER test_delete_failure ON app.notifications; DROP FUNCTION app.test_fail_delete(); SET ROLE fe_server;",
+    );
+    const deletion = await del(second.id, 5);
+    expect(deletion.status).toBe(200);
+    const receipt = (await deletion.json()).data;
+    expect(receipt).toMatchObject({ id: second.id, version: 6, deleted: true });
+    const [deletedEvent] =
+      await query`SELECT version,deleted_at,updated_at FROM app.events WHERE id=${second.id}`;
+    expect(deletedEvent.deleted_at).toBeTruthy();
+    expect(deletedEvent.updated_at).toEqual(deletedEvent.deleted_at);
+    expect(
+      (
+        await query`SELECT status,cancel_reason,version FROM app.gift_reservations WHERE gift_id=${gift.id}`
+      )[0],
+    ).toMatchObject({
+      status: "cancelled",
+      cancel_reason: "event_deleted",
+      version: 2,
+    });
+    expect(
+      (
+        await query`SELECT enabled,revoked_at FROM app.notification_subscriptions WHERE id=${sub.id}`
+      )[0],
+    ).toMatchObject({ enabled: false });
+    expect(
+      (
+        await query`SELECT status FROM app.notifications WHERE subscription_id=${sub.id}`
+      )[0].status,
+    ).toBe("cancelled");
+    expect(
+      await query`SELECT id FROM app.rsvps WHERE event_id=${second.id}`,
+    ).toHaveLength(1);
+    expect(
+      await query`SELECT id FROM app.wishlists WHERE event_id=${second.id}`,
+    ).toHaveLength(1);
+    expect(
+      await query`SELECT id FROM app.gifts WHERE id=${gift.id}`,
+    ).toHaveLength(1);
+    expect((await (await del(second.id, 5)).json()).data).toEqual(receipt);
+    expect(
+      (await (await del(second.id, 999, "key-delete-fresh-001")).json()).data,
+    ).toEqual(receipt);
+    expect(
+      (
+        await query`SELECT version,deleted_at,updated_at FROM app.events WHERE id=${second.id}`
+      )[0],
+    ).toEqual(deletedEvent);
+    expect((await del(second.id, 6)).status).toBe(409); // Reuse with different payload.
+    expect((await get(second.id)).status).toBe(404);
+    expect(
+      (await patch(second.id, full, 6, "key-edit-deleted-001")).status,
+    ).toBe(404);
+    await expect(
+      EditPage({ params: Promise.resolve({ eventId: second.id }) }),
+    ).rejects.toThrow("TEST_NOT_FOUND");
+    await expect(
+      query`SELECT * FROM app.reserve_gift(${publicEvent.public_id},${gift.id},${guest.id})`,
+    ).rejects.toThrow();
+    await expect(
+      query`UPDATE app.notification_subscriptions SET enabled=true,revoked_at=NULL WHERE id=${sub.id}`,
+    ).rejects.toThrow();
+    bridge.cookies.set("__Host-fe_org", other.raw);
+    expect((await del(second.id, 6, "key-delete-other-001")).status).toBe(404);
+    bridge.cookies.set("__Host-fe_org", owner.raw);
     await query`UPDATE app.events SET deleted_at=now() WHERE id=${first.id}`;
     expect((await patch(first.id, minimal)).status).toBe(404);
     expect((await get(first.id)).status).toBe(404);
@@ -472,6 +639,7 @@ it("creates real events atomically and enforces validation, idempotency and owne
     ).rejects.toThrow("TEST_NOT_FOUND");
     bridge.cookies.delete("__Host-fe_org");
     expect((await patch(second.id, full)).status).toBe(401);
+    expect((await del(second.id)).status).toBe(401);
     await expect(
       EditPage({ params: Promise.resolve({ eventId: second.id }) }),
     ).rejects.toThrow("TEST_REDIRECT:/login?returnTo=");

@@ -112,6 +112,7 @@ export const giftInput = z
 export const expectedVersionInput = z.object({
   expectedVersion: z.number().int().positive(),
 });
+export const eventDeleteInput = expectedVersionInput.strict();
 export const eventUpdateInput = z
   .object({
     expectedVersion: z.number().int().positive(),

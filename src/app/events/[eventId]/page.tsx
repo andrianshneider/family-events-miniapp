@@ -24,7 +24,7 @@ export default async function EventPage({
   }
   return (
     <EventScreen
-      key={event.id}
+      key={`${event.id}:${event.version}`}
       initialEvent={event}
       created={(await searchParams).created === "1"}
       updated={(await searchParams).updated === "1"}

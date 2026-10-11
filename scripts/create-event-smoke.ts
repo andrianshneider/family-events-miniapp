@@ -518,6 +518,366 @@ try {
     editParallel.map((response) => response.status).sort(),
     [200, 409],
   );
+  phase = "slice03 significant audit and real RSVP counts";
+  const [guest] =
+    await sql`INSERT INTO app.guest_identities(linked_user_id,display_name) VALUES(${other.id},'Slice03 guest') RETURNING id`;
+  await sql`INSERT INTO app.telegram_channels(user_id,chat_id,permission_granted_at,permission_source,delivery_state) VALUES(${other.id},${ids[1]},now(),'bot_start','ready')`;
+  const [sub] =
+    await sql`INSERT INTO app.notification_subscriptions(event_id,user_id,role,guest_identity_id,enabled,consented_at) VALUES(${fullEvent.id},${other.id},'guest',${guest.id},true,now()) RETURNING id`;
+  await sql`INSERT INTO app.rsvps(event_id,guest_identity_id,guest_name,status,adults_count,children_count) VALUES(${fullEvent.id},${guest.id},'Slice03 guest','yes',2,3)`;
+  const [wishlist] =
+    await sql`SELECT id FROM app.wishlists WHERE event_id=${fullEvent.id}`;
+  const [gift] =
+    await sql`INSERT INTO app.gifts(wishlist_id,title) VALUES(${wishlist.id},'Slice03 gift') RETURNING id`;
+  await sql`SELECT * FROM app.reserve_gift(${fullEvent.publicId},${gift.id},${guest.id})`;
+  await sql`INSERT INTO app.notifications(subscription_id,type,trigger_key,payload,scheduled_at,next_attempt_at) VALUES(${sub.id},'reminder_24h','obsolete-schedule','{}',now()+interval '10 years',now()+interval '10 years')`;
+  const beforeAudit = (await (await request(owner, patchPath)).json()).data;
+  const newFields = {
+    ...editedFields,
+    coverAssetId: replacementId,
+    venueName: "Slice03 new venue",
+    address: "Slice03 new address",
+    startTime: "19:00",
+    endTime: "22:00",
+  };
+  const auditKey = randomUUID();
+  const auditPayload = {
+    expectedVersion: beforeAudit.version,
+    fields: newFields,
+  };
+  const auditResponse = await request(
+    owner,
+    patchPath,
+    "PATCH",
+    auditPayload,
+    auditKey,
+  );
+  assert.equal(auditResponse.status, 200);
+  const audit = (await auditResponse.json()).data;
+  assert.equal(audit.notificationRecipientsCount, 1);
+  const [change] =
+    await sql`SELECT event_version,actor_user_id,changes,notify_decision,decided_at FROM app.event_changes WHERE id=${audit.changeId}`;
+  assert.equal(change.notify_decision, "pending");
+  assert.equal(change.decided_at, null);
+  assert.equal(change.actor_user_id, owner.id);
+  assert.equal(change.event_version, audit.version);
+  assert.deepEqual(change.changes.venueName, {
+    before: editedFields.venueName,
+    after: newFields.venueName,
+  });
+  assert.deepEqual(change.changes.startTime, {
+    before: "18:00",
+    after: "19:00",
+  });
+  assert.equal(
+    (
+      await sql`SELECT status FROM app.notifications WHERE subscription_id=${sub.id}`
+    )[0].status,
+    "cancelled",
+  );
+  assert.equal(
+    (await request(owner, patchPath, "PATCH", auditPayload, auditKey)).status,
+    200,
+  );
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.event_changes WHERE id=${audit.changeId}`
+    )[0].count,
+    1,
+  );
+  const latest = (await (await request(owner, patchPath)).json()).data;
+  assert.deepEqual(latest.responses, {
+    yes: 1,
+    no: 0,
+    maybe: 0,
+    adults: 2,
+    children: 3,
+  });
+  assert(!JSON.stringify(latest.wishlist).includes("Slice03 guest"));
+  await sql`UPDATE app.events SET venue_name=${"  " + newFields.venueName + "  "},address=${"  " + newFields.address + "  "} WHERE id=${fullEvent.id}`;
+  const [countBefore] =
+    await sql`SELECT count(*)::int AS count FROM app.event_changes WHERE event_id=${fullEvent.id}`;
+  const insignificantFields = {
+    ...newFields,
+    title: "Slice03 final title",
+    venueName: "  " + newFields.venueName + "  ",
+    address: "  " + newFields.address + "  ",
+    description: "Only description",
+    dressCode: "Only dress",
+  };
+  assert.equal(
+    (
+      await request(
+        owner,
+        patchPath,
+        "PATCH",
+        { expectedVersion: latest.version, fields: insignificantFields },
+        randomUUID(),
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.event_changes WHERE event_id=${fullEvent.id}`
+    )[0].count,
+    countBefore.count,
+  );
+  phase =
+    "slice03 delete confirmation markup, transaction and repeated receipt";
+  const manageHtml = await (
+    await request(owner, `/events/${fullEvent.id}`)
+  ).text();
+  assert(
+    manageHtml.includes("Другие действия с событием") &&
+      manageHtml.includes("Действия с событием"),
+  );
+  const active = (await (await request(owner, patchPath)).json()).data;
+  const deletePayload = { expectedVersion: active.version };
+  assert.equal(
+    (await request(other, patchPath, "DELETE", deletePayload, randomUUID()))
+      .status,
+    404,
+  );
+  assert.equal(
+    (
+      await request(
+        { ...owner, csrf: "invalid" },
+        patchPath,
+        "DELETE",
+        deletePayload,
+        randomUUID(),
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request(
+        owner,
+        patchPath,
+        "DELETE",
+        { ...deletePayload, organizerId: other.id },
+        randomUUID(),
+      )
+    ).status,
+    422,
+  );
+  assert.equal(
+    (
+      await request(
+        owner,
+        patchPath,
+        "DELETE",
+        { expectedVersion: active.version - 1 },
+        randomUUID(),
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    (await request(owner, patchPath, "DELETE", deletePayload)).status,
+    422,
+  );
+  assert.equal((await request(owner, patchPath)).status, 200); // Opening/cancelling dialog has no mutation.
+  await sql`INSERT INTO app.notifications(subscription_id,type,trigger_key,payload,scheduled_at,next_attempt_at,status,locked_until) VALUES(${sub.id},'event_changed','delete-pending','{}',now()+interval '10 years',now()+interval '10 years','pending',NULL),(${sub.id},'event_changed','delete-processing','{}',now()+interval '10 years',now()+interval '10 years','processing',now()+interval '2 minutes')`;
+  const deleteKey = randomUUID();
+  const removed = await request(
+    owner,
+    patchPath,
+    "DELETE",
+    deletePayload,
+    deleteKey,
+  );
+  assert.equal(removed.status, 200);
+  const receipt = (await removed.json()).data;
+  assert.equal(receipt.deleted, true);
+  assert.equal(receipt.version, active.version + 1);
+  // Simulates a lost HTTP response: replay the exact receipt, never infer deletion from 404.
+  assert.deepEqual(
+    (
+      await (
+        await request(owner, patchPath, "DELETE", deletePayload, deleteKey)
+      ).json()
+    ).data,
+    receipt,
+  );
+  assert.deepEqual(
+    (
+      await (
+        await request(
+          owner,
+          patchPath,
+          "DELETE",
+          { expectedVersion: 999 },
+          randomUUID(),
+        )
+      ).json()
+    ).data,
+    receipt,
+  );
+  assert.equal(
+    (await request(other, patchPath, "DELETE", deletePayload, randomUUID()))
+      .status,
+    404,
+  );
+  const [soft] =
+    await sql`SELECT deleted_at,updated_at,version FROM app.events WHERE id=${fullEvent.id}`;
+  assert(soft.deleted_at);
+  assert.equal(
+    new Date(soft.updated_at).getTime(),
+    new Date(soft.deleted_at).getTime(),
+  );
+  const [reservation] =
+    await sql`SELECT status,cancel_reason,version FROM app.gift_reservations WHERE gift_id=${gift.id}`;
+  assert.deepEqual(reservation, {
+    status: "cancelled",
+    cancel_reason: "event_deleted",
+    version: 2,
+  });
+  assert.equal(
+    (
+      await sql`SELECT enabled FROM app.notification_subscriptions WHERE id=${sub.id}`
+    )[0].enabled,
+    false,
+  );
+  assert(
+    (
+      await sql`SELECT status,locked_until FROM app.notifications WHERE subscription_id=${sub.id}`
+    ).every((row) => row.status === "cancelled" && row.locked_until === null),
+  );
+  for (const path of [
+    patchPath,
+    `/api/v1/events/${fullEvent.id}/cover`,
+    `/api/v1/public/events/${fullEvent.publicId}/cover`,
+    `/api/v1/media/${replacementId}`,
+  ])
+    assert.equal((await request(owner, path)).status, 404);
+  assert.equal(
+    (
+      await request(
+        owner,
+        patchPath,
+        "PATCH",
+        { expectedVersion: receipt.version, fields: newFields },
+        randomUUID(),
+      )
+    ).status,
+    404,
+  );
+  for (const path of [
+    `/events/${fullEvent.id}`,
+    `/events/${fullEvent.id}/edit`,
+  ]) {
+    const html = await (await request(owner, path)).text();
+    assert(html.includes("Событие недоступно"));
+    assert(!html.includes(insignificantFields.title));
+  }
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.rsvps WHERE event_id=${fullEvent.id}`
+    )[0].count,
+    1,
+  );
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.gifts WHERE id=${gift.id}`
+    )[0].count,
+    1,
+  );
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.wishlists WHERE event_id=${fullEvent.id}`
+    )[0].count,
+    1,
+  );
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.event_changes WHERE event_id=${fullEvent.id}`
+    )[0].count,
+    countBefore.count,
+  );
+  assert(
+    !(await (await request(owner, "/api/v1/events")).json()).data.events.some(
+      (item: { id: string }) => item.id === fullEvent.id,
+    ),
+  );
+  phase = "slice03 actual parallel edit/delete";
+  const racePath = `/api/v1/events/${event.id}`;
+  const race = await Promise.all([
+    request(
+      owner,
+      racePath,
+      "PATCH",
+      {
+        expectedVersion: 1,
+        fields: { ...minimal, title: "Slice03 race edit" },
+      },
+      randomUUID(),
+    ),
+    request(owner, racePath, "DELETE", { expectedVersion: 1 }, randomUUID()),
+  ]);
+  assert(
+    [
+      [200, 409],
+      [404, 200],
+    ].some((expected) =>
+      expected.every((status, i) => race[i].status === status),
+    ),
+  );
+  if (race[1].status === 409)
+    assert.equal(
+      (
+        await request(
+          owner,
+          racePath,
+          "DELETE",
+          { expectedVersion: 2 },
+          randomUUID(),
+        )
+      ).status,
+      200,
+    );
+  phase = "slice03 actual parallel reservation/delete";
+  const raceEvent = (await (await request(owner, "/api/v1/events")).json()).data
+    .events[0];
+  assert(raceEvent);
+  const [raceDb] =
+    await sql`SELECT public_id,version FROM app.events WHERE id=${raceEvent.id}`;
+  const [raceWishlist] =
+    await sql`SELECT id FROM app.wishlists WHERE event_id=${raceEvent.id}`;
+  const [raceGift] =
+    await sql`INSERT INTO app.gifts(wishlist_id,title) VALUES(${raceWishlist.id},'Slice03 race gift') RETURNING id`;
+  const raceResults = await Promise.allSettled([
+    request(
+      owner,
+      `/api/v1/events/${raceEvent.id}`,
+      "DELETE",
+      { expectedVersion: raceDb.version },
+      randomUUID(),
+    ),
+    sql`SELECT * FROM app.reserve_gift(${raceDb.public_id},${raceGift.id},${guest.id})`,
+  ]);
+  assert(
+    raceResults[0].status === "fulfilled" &&
+      raceResults[0].value instanceof Response &&
+      raceResults[0].value.status === 200,
+  );
+  if (raceResults[1].status === "rejected")
+    assert.equal(raceResults[1].reason.code, "P0002");
+  assert.equal(
+    (
+      await sql`SELECT count(*)::int AS count FROM app.gift_reservations WHERE gift_id=${raceGift.id} AND status='active'`
+    )[0].count,
+    0,
+  );
+  const empty = (await (await request(owner, "/api/v1/events")).json()).data;
+  assert.equal(empty.events.length, 0);
+  const emptyHtml = await (await request(owner, "/events?deleted=1")).text();
+  assert(
+    emptyHtml.includes("Событие удалено") &&
+      emptyHtml.includes("У вас пока нет событий"),
+  );
   phase = "expired session and safe auth return";
   const hash = createHash("sha256").update(owner.cookie.split("=")[1]).digest();
   await sql`UPDATE app.organizer_sessions SET created_at=now()-make_interval(days=>31),expires_at=now()-make_interval(secs=>1) WHERE token_hash=${hash}`;
@@ -561,7 +921,18 @@ try {
     await sql`SELECT return_path FROM app.auth_transactions WHERE state_hash=${createHash("sha256").update(oidcState).digest()}`;
   assert.equal(auth.return_path, editPath);
   phase = "soft deletion";
-  await sql`UPDATE app.events SET deleted_at=now() WHERE id=${event.id} AND organizer_id=${owner.id}`;
+  assert.equal(
+    (
+      await request(
+        owner,
+        `/api/v1/events/${event.id}`,
+        "DELETE",
+        { expectedVersion: 1 },
+        randomUUID(),
+      )
+    ).status,
+    200,
+  );
   assert.equal(
     (await request(owner, `/api/v1/events/${event.id}`)).status,
     404,
@@ -573,7 +944,7 @@ try {
       !deletedHtml.includes(minimal.title),
   );
   console.info(
-    "PASS: staging creation and editing, minimal/full event + wishlist, cover replacement/removal, CSRF, validation, idempotency, concurrent version conflict, DB persistence, refresh, private pages, actual Storage upload/EXIF removal, owner isolation, expiry and edit auth returnTo. Browser interaction and iPhone checks remain manual.",
+    "PASS: staging Slice03 soft deletion, retained history, cancelled reservations/subscriptions/outbox, version conflict, idempotent receipt after lost response, real parallel edit/delete and reservation/delete, empty state, closed private/public covers; creation and editing, minimal/full event + wishlist, cover replacement/removal, CSRF, validation, idempotency, concurrent version conflict, DB persistence, refresh, private pages, actual Storage upload/EXIF removal, owner isolation, expiry and edit auth returnTo. Browser interaction and iPhone checks remain manual.",
   );
 } catch {
   console.error(
@@ -604,12 +975,19 @@ try {
     await sql.begin(async (tx) => {
       await tx`DELETE FROM app.analytics_events WHERE user_id=${user.id}`;
       await tx`DELETE FROM app.api_idempotency WHERE principal_key=${"organizer:" + user.id}`;
+      await tx`DELETE FROM app.notifications WHERE subscription_id IN(SELECT s.id FROM app.notification_subscriptions s JOIN app.events e ON e.id=s.event_id WHERE e.organizer_id=${user.id})`;
+      await tx`DELETE FROM app.notification_subscriptions WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${user.id})`;
+      await tx`DELETE FROM app.gift_reservations WHERE gift_id IN(SELECT g.id FROM app.gifts g JOIN app.wishlists w ON w.id=g.wishlist_id JOIN app.events e ON e.id=w.event_id WHERE e.organizer_id=${user.id})`;
+      await tx`DELETE FROM app.gifts WHERE wishlist_id IN(SELECT w.id FROM app.wishlists w JOIN app.events e ON e.id=w.event_id WHERE e.organizer_id=${user.id})`;
+      await tx`DELETE FROM app.rsvps WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${user.id})`;
       await tx`DELETE FROM app.wishlists WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${user.id})`;
       await tx`DELETE FROM app.event_changes WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${user.id})`;
       await tx`DELETE FROM app.events WHERE organizer_id=${user.id}`;
       await tx`DELETE FROM app.media_assets WHERE owner_user_id=${user.id}`;
       await tx`DELETE FROM app.mini_app_logins WHERE session_hash IN(SELECT token_hash FROM app.organizer_sessions WHERE user_id=${user.id})`;
       await tx`DELETE FROM app.organizer_sessions WHERE user_id=${user.id}`;
+      await tx`DELETE FROM app.telegram_channels WHERE user_id=${user.id}`;
+      await tx`DELETE FROM app.guest_identities WHERE linked_user_id=${user.id} AND display_name='Slice03 guest'`;
       await tx`DELETE FROM app.users WHERE id=${user.id}`;
     });
   }

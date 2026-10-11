@@ -1,11 +1,11 @@
 "use client";
 import Link from "next/link";
+import { watchEventChanges } from "@/lib/event-updates";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { organizerEvent } from "@/server/services/events";
 import { eventDateLabel, eventTypes } from "./event-presentation";
-import { TelegramBack } from "./telegram-back";
+import { EventActions } from "./event-actions";
 import { OrganizerHeader } from "./organizer-header";
 type Event = Awaited<ReturnType<typeof organizerEvent>>;
 export function EventScreen({
@@ -17,7 +17,6 @@ export function EventScreen({
   created: boolean;
   updated?: boolean;
 }) {
-  const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -29,7 +28,7 @@ export function EventScreen({
   const refreshing = useRef(false);
   const refreshedAt = useRef(0);
   async function refresh() {
-    if (refreshing.current) return;
+    if (refreshing.current || document.querySelector("dialog[open]")) return;
     refreshing.current = true;
     setPending(true);
     setError("");
@@ -39,6 +38,7 @@ export function EventScreen({
         signal: AbortSignal.timeout(10000),
       });
       if (response.status === 401) {
+        setUnavailable(true);
         window.location.replace("/login");
         return;
       }
@@ -72,9 +72,15 @@ export function EventScreen({
     };
     document.addEventListener("visibilitychange", restore);
     window.addEventListener("pageshow", show);
+    window.addEventListener("online", restore);
+    const interval = window.setInterval(restore, 15000);
+    const stopWatching = watchEventChanges(restore);
     return () => {
       document.removeEventListener("visibilitychange", restore);
       window.removeEventListener("pageshow", show);
+      window.removeEventListener("online", restore);
+      window.clearInterval(interval);
+      stopWatching();
     };
     // Only the stable event ID identifies this subscription; server rechecks ownership on each request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -91,7 +97,6 @@ export function EventScreen({
     );
   return (
     <main className="shell event-shell">
-      <TelegramBack onBack={() => router.push("/events")} />
       <OrganizerHeader displayName={event.displayName} />
       <Link className="text-button back" href="/events">
         ← Мои события
@@ -106,9 +111,12 @@ export function EventScreen({
           Изменения сохранены
         </p>
       )}
-      <Link href={`/events/${event.id}/edit`} className="primary">
-        Редактировать событие
-      </Link>
+      <EventActions
+        id={event.id}
+        title={event.title}
+        version={event.version}
+        onConflict={() => void refresh()}
+      />
       {error && (
         <div className="notice error" role="alert">
           {error}

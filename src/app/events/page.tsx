@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { AppError } from "@/server/errors";
 import { EventsScreen } from "@/components/events-screen";
 export const dynamic = "force-dynamic";
-export default async function Events() {
+export default async function Events({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string }>;
+}) {
   const { value: initial } = await measured(async () => {
     let session;
     try {
@@ -19,5 +23,10 @@ export default async function Events() {
       profile: session.profile,
     };
   });
-  return <EventsScreen initial={initial} />;
+  return (
+    <EventsScreen
+      initial={initial}
+      deleted={(await searchParams).deleted === "1"}
+    />
+  );
 }

@@ -521,3 +521,33 @@ a:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.event-actions {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin: 16px 0;
+}
+.event-actions .primary {
+  margin: 0;
+  flex: 1;
+}
+.event-more {
+  width: 52px;
+  flex: 0 0 52px;
+  margin: 0;
+}
+.danger {
+  background: #a32d45;
+  color: white;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-height: 52px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.delete-event-name {
+  overflow-wrap: anywhere;
+}

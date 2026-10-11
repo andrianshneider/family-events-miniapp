@@ -52,8 +52,11 @@ export async function updateEvent(
           ],
           endTime: [before.end_time?.slice(0, 5) ?? null, data.endTime ?? null],
           timezone: [before.timezone, data.timezone],
-          venueName: [before.venue_name ?? "", data.venueName ?? ""],
-          address: [before.address ?? "", data.address ?? ""],
+          venueName: [
+            (before.venue_name ?? "").trim(),
+            (data.venueName ?? "").trim(),
+          ],
+          address: [(before.address ?? "").trim(), (data.address ?? "").trim()],
         };
         const changes = Object.fromEntries(
           Object.entries(significant)
@@ -79,6 +82,45 @@ export async function updateEvent(
             version: event.version as number,
             changeId,
             notificationRecipientsCount: recipients.count as number,
+          },
+        };
+      },
+    );
+  });
+}
+// Keep the event lock before the idempotency receipt and all child mutations.
+// A confirmed receipt can be retried even after the event becomes unavailable to GET.
+export async function deleteEvent(
+  principal: OrganizerPrincipal,
+  eventId: string,
+  input: { expectedVersion: number },
+  key: string,
+) {
+  return transaction(async (tx) => {
+    const [event] =
+      await tx`SELECT id,version,deleted_at FROM app.events WHERE id=${eventId} AND organizer_id=${principal.userId} FOR UPDATE`;
+    if (!event) throw unavailable();
+    return idempotent(
+      tx,
+      "organizer:" + principal.userId,
+      `DELETE /events/${eventId}`,
+      key,
+      input,
+      async () => {
+        // Own repeated deletion is a confirmed success, including with a fresh key.
+        // No version increment or child side effects happen again.
+        if (!event.deleted_at) {
+          expectedVersion(event.version, input.expectedVersion);
+          await tx`SELECT app.soft_delete_event(${eventId},${principal.userId},${input.expectedVersion})`;
+        }
+        const [deleted] =
+          await tx`SELECT id,version,deleted_at FROM app.events WHERE id=${eventId}`;
+        return {
+          status: 200,
+          body: {
+            id: deleted.id as string,
+            version: deleted.version as number,
+            deleted: true,
           },
         };
       },

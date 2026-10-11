@@ -373,10 +373,20 @@ try {
     listed.find((item: { id: string }) => item.id === event.id).coverUrl,
     null,
   );
+  const thumbnailUrl = listed.find(
+    (item: { id: string }) => item.id === fullEvent.id,
+  ).coverUrl;
   assert.equal(
-    listed.find((item: { id: string }) => item.id === fullEvent.id).coverUrl,
-    fullDetail.coverUrl,
+    new URL(thumbnailUrl).origin,
+    new URL(process.env.SUPABASE_URL!).origin,
   );
+  const thumbnailResponse = await fetch(thumbnailUrl);
+  assert.equal(thumbnailResponse.status, 200);
+  const thumbnailMetadata = await sharp(
+    Buffer.from(await thumbnailResponse.arrayBuffer()),
+  ).metadata();
+  assert(thumbnailMetadata.width! <= 640 && thumbnailMetadata.height! <= 384);
+  assert.equal(thumbnailMetadata.exif, undefined);
   phase = "edit event, replace/remove cover, version conflict and ownership";
   const editPath = `/events/${fullEvent.id}/edit`;
   const editHtml = await (await request(owner, editPath)).text();

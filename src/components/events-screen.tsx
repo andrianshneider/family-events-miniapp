@@ -1,8 +1,9 @@
 "use client";
 import { InstallHelp } from "./install-help";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import type { EventList } from "@/server/services/event-list";
 import { readEventForm } from "@/lib/event-form-state";
 type EventItem = {
   id: string;
@@ -19,53 +20,74 @@ type Loaded = {
   nextCursor: string | null;
   resumeDraft: boolean;
 };
-export function EventsScreen() {
-  const [data, setData] = useState<Loaded | null>(null);
+type Initial = EventList & {
+  profile: { id: string; displayName: string; avatarUrl: string | null };
+};
+export function EventsScreen({ initial }: { initial: Initial }) {
+  const [data, setData] = useState<Loaded>({
+    name: initial.profile.displayName,
+    events: initial.events,
+    nextCursor: initial.nextCursor,
+    resumeDraft: false,
+  });
+  const flight = useRef<Promise<void> | null>(null);
+  const lastRefresh = useRef(0);
+
   const [error, setError] = useState("");
-  const [pending, setPending] = useState(true);
+  const [pending, setPending] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [moreError, setMoreError] = useState("");
-  const load = useCallback(async () => {
-    try {
-      const me = await fetch("/api/v1/me", { cache: "no-store" });
-      if (me.status === 401) {
-        window.location.replace("/login");
-        return;
-      }
-      if (!me.ok)
-        throw Error("Не удалось проверить сессию. Повторите попытку.");
-      const profile = await me.json();
-      const response = await fetch("/api/v1/events", { cache: "no-store" });
-      if (response.status === 401) {
-        window.location.replace("/login");
-        return;
-      }
-      if (!response.ok)
-        throw Error("Не удалось загрузить события. Повторите попытку.");
-      const result = await response.json();
-      let resumeDraft = false;
+  const load = useCallback(() => {
+    if (flight.current) return flight.current;
+    setPending(true);
+    const work = (async () => {
       try {
-        const raw = localStorage.getItem("fe-create-event-form-v1");
-        resumeDraft = !!readEventForm(raw, profile.data.id);
-        if (raw && !resumeDraft)
-          localStorage.removeItem("fe-create-event-form-v1");
-      } catch {
-        /* Temporary form storage is optional; the server remains authoritative. */
+        const response = await fetch("/api/v1/events", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(10000),
+        });
+        if (response.status === 401) {
+          setData({
+            name: "",
+            events: [],
+            nextCursor: null,
+            resumeDraft: false,
+          });
+          window.location.replace("/login");
+          return;
+        }
+        if (!response.ok)
+          throw Error(
+            "Не удалось обновить события. Сохранённый список остаётся на экране.",
+          );
+        const result = await response.json();
+        let resumeDraft = false;
+        try {
+          resumeDraft = !!readEventForm(
+            localStorage.getItem("fe-create-event-form-v1"),
+            result.data.profile.id,
+          );
+        } catch {}
+        setData({
+          name: result.data.profile.displayName,
+          events: result.data.events,
+          nextCursor: result.data.nextCursor,
+          resumeDraft,
+        });
+        setError("");
+        lastRefresh.current = Date.now();
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Не удалось обновить события.",
+        );
+      } finally {
+        setPending(false);
+        flight.current = null;
       }
-      setData({
-        name: profile.data.displayName,
-        events: result.data.events,
-        nextCursor: result.data.nextCursor,
-        resumeDraft,
-      });
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Не удалось загрузить события.",
-      );
-    } finally {
-      setPending(false);
-    }
+    })();
+    flight.current = work;
+    return work;
   }, []);
   async function loadMore() {
     if (!data?.nextCursor || loadingMore) return;
@@ -108,26 +130,38 @@ export function EventsScreen() {
     }
   }
   useEffect(() => {
-    // The effect starts an asynchronous session/API request; updates follow its result.
+    // Initial data already arrived in server HTML; read only optional local draft state.
+    let draft = false;
+    try {
+      const raw = localStorage.getItem("fe-create-event-form-v1");
+      draft = !!readEventForm(raw, initial.profile.id);
+      if (raw && !draft) localStorage.removeItem("fe-create-event-form-v1");
+    } catch {}
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load();
+    setData((current) => ({ ...current, resumeDraft: draft }));
     const restore = () => {
-      if (document.visibilityState !== "visible") return;
-      setPending(true);
-      setError("");
-      setMoreError("");
+      if (
+        document.visibilityState !== "visible" ||
+        Date.now() - lastRefresh.current < 1000
+      )
+        return;
+      lastRefresh.current = Date.now();
       void load();
     };
     const show = (event: PageTransitionEvent) => {
       if (event.persisted) restore();
     };
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, 90000);
     document.addEventListener("visibilitychange", restore);
     window.addEventListener("pageshow", show);
     return () => {
+      window.clearInterval(interval);
       document.removeEventListener("visibilitychange", restore);
       window.removeEventListener("pageshow", show);
     };
-  }, [load]);
+  }, [load, initial.profile.id]);
   async function logout() {
     setLoggingOut(true);
     setError("");
@@ -167,7 +201,7 @@ export function EventsScreen() {
       {data && (
         <p className="muted">{data.name}, здесь ваши праздники и встречи.</p>
       )}
-      {pending && <p role="status">Загружаем события…</p>}
+      {pending && <p role="status">Обновляем события…</p>}
       {error && (
         <div role="alert" className="card error">
           <p>{error}</p>
@@ -183,9 +217,7 @@ export function EventsScreen() {
           </button>
         </div>
       )}
-      {!pending &&
-        !error &&
-        data &&
+      {data &&
         (data.events.length ? (
           <>
             <ul className="event-list">
@@ -230,7 +262,7 @@ export function EventsScreen() {
               <button
                 className="secondary"
                 onClick={loadMore}
-                disabled={loadingMore}
+                disabled={loadingMore || pending}
               >
                 {loadingMore
                   ? "Загружаем…"
@@ -251,10 +283,10 @@ export function EventsScreen() {
             </Link>
           </section>
         ))}
-      {data && !pending && (
+      {data && (
         <button
           className="secondary refresh"
-          disabled={loadingMore}
+          disabled={loadingMore || pending}
           onClick={() => {
             setPending(true);
             setError("");

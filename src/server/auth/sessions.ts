@@ -4,6 +4,7 @@ import type { NextResponse } from "next/server";
 import type { OrganizerPrincipal, GuestPrincipal } from "@/types/principal";
 import { db, type Transaction } from "../db/client";
 import { token, tokenHash } from "./crypto";
+import { timed } from "../performance";
 import { unauthenticated } from "../errors";
 export const ORG_COOKIE = "__Host-fe_org",
   REAUTH_COOKIE = "__Host-fe_reauth",
@@ -51,4 +52,26 @@ export async function guest(): Promise<GuestPrincipal> {
     await db()`SELECT s.id,g.id AS identity_id FROM app.guest_sessions s JOIN app.guest_identities g ON g.id=s.guest_identity_id WHERE s.token_hash=${tokenHash(raw)} AND s.revoked_at IS NULL AND s.expires_at>now() AND g.merged_into_id IS NULL`;
   if (!row) throw unauthenticated();
   return { kind: "guest", guestIdentityId: row.identity_id, sessionId: row.id };
+}
+
+export async function organizerProfile() {
+  return timed("session", async () => {
+    const raw = validToken((await cookies()).get(ORG_COOKIE)?.value);
+    if (!raw) throw unauthenticated();
+    const [row] =
+      await db()`SELECT s.id,s.user_id,u.display_name,u.avatar_url FROM app.organizer_sessions s JOIN app.users u ON u.id=s.user_id WHERE s.token_hash=${tokenHash(raw)} AND s.revoked_at IS NULL AND s.expires_at>now()`;
+    if (!row) throw unauthenticated();
+    return {
+      principal: {
+        kind: "organizer" as const,
+        userId: row.user_id as string,
+        sessionId: row.id as string,
+      },
+      profile: {
+        id: row.user_id as string,
+        displayName: row.display_name as string,
+        avatarUrl: row.avatar_url as string | null,
+      },
+    };
+  });
 }

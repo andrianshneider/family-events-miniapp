@@ -581,7 +581,10 @@ try {
       await sql`SELECT storage_path FROM app.media_assets WHERE owner_user_id=${user.id}`;
     if (paths.length) {
       const removed = await storage.remove(
-        paths.map((row) => row.storage_path),
+        paths.flatMap((row) => [
+          row.storage_path,
+          row.storage_path.replace(/\.webp$/, ".thumb.webp"),
+        ]),
       );
       if (removed.error) {
         console.error("Fixture Storage cleanup failed; paths suppressed.");

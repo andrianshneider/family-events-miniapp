@@ -1,4 +1,5 @@
 import "server-only";
+import { thumbnailPath } from "./thumbnails";
 import { db } from "../db/client";
 import { storage, mediaBucket } from "./client";
 export async function cleanupMedia() {
@@ -17,7 +18,7 @@ export async function cleanupMedia() {
       await tx`UPDATE app.media_assets SET state='deleted',deleted_at=coalesce(deleted_at,now()) WHERE id=${asset.id}`;
       const { error } = await storage()
         .from(mediaBucket())
-        .remove([asset.storage_path]);
+        .remove([asset.storage_path, thumbnailPath(asset.storage_path)]);
       if (error) throw new Error("Storage cleanup failed");
       removed++;
     });

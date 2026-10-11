@@ -28,6 +28,17 @@ vi.mock("next/navigation", () => ({
   },
   useRouter: () => ({ push: vi.fn() }),
 }));
+vi.mock("@/server/storage/client", () => ({
+  mediaBucket: () => "test",
+  storage: () => ({
+    from: () => ({
+      createSignedUrls: async () => ({
+        data: null,
+        error: { message: "unavailable" },
+      }),
+    }),
+  }),
+}));
 import { POST as miniLogin } from "@/app/api/auth/telegram/mini-app/route";
 import { POST as create, GET as list } from "@/app/api/v1/events/route";
 import {

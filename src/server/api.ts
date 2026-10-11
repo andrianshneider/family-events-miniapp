@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppError } from "./errors";
 import { log } from "./log";
+import { measured } from "./performance";
 import { MissingSettingError } from "./config";
 export const reply = (data: unknown, requestId: string, status = 200) =>
   NextResponse.json(
@@ -23,7 +24,11 @@ export function endpoint(
     const requestId = randomUUID(),
       start = Date.now();
     try {
-      const response = await handler(request, requestId);
+      const { value: response, serverTiming } = await measured(
+        () => handler(request, requestId),
+        requestId,
+      );
+      response.headers.set("Server-Timing", serverTiming);
       log("request", {
         requestId,
         status: response.status,

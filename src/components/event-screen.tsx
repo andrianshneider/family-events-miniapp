@@ -26,7 +26,11 @@ export function EventScreen({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
+  const refreshing = useRef(false);
+  const refreshedAt = useRef(0);
   async function refresh() {
+    if (refreshing.current) return;
+    refreshing.current = true;
     setPending(true);
     setError("");
     try {
@@ -49,15 +53,22 @@ export function EventScreen({
         "Не удалось обновить событие. Сохранённые сведения остаются на экране; повторите попытку.",
       );
     } finally {
+      refreshing.current = false;
+      refreshedAt.current = Date.now();
       setPending(false);
     }
   }
   useEffect(() => {
     const restore = () => {
-      if (document.visibilityState === "visible") void refresh();
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - refreshedAt.current > 1000
+      )
+        void refresh();
     };
     const show = (event: PageTransitionEvent) => {
-      if (event.persisted) void refresh();
+      if (event.persisted && Date.now() - refreshedAt.current > 1000)
+        void refresh();
     };
     document.addEventListener("visibilitychange", restore);
     window.addEventListener("pageshow", show);

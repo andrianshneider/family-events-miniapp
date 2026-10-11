@@ -4,6 +4,7 @@ export function log(
   event: string,
   fields: {
     requestId?: string;
+    timings?: Record<string, number>;
     code?: string;
     status?: number;
     durationMs?: number;

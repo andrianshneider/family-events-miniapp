@@ -4,6 +4,7 @@ import sharp from "sharp";
 import type { OrganizerPrincipal } from "@/types/principal";
 import { transaction, db } from "../db/client";
 import { AppError } from "../errors";
+import { thumbnail, thumbnailPath } from "./thumbnails";
 import { storage, mediaBucket } from "./client";
 export const MAX_BYTES = 10485760,
   MAX_PIXELS = 20000000;
@@ -104,10 +105,25 @@ export async function completeUpload(
         "UPLOAD_UNAVAILABLE",
         "Не удалось сохранить изображение.",
       );
+    const thumbPath = thumbnailPath(path);
+    const thumbResult = await storage()
+      .from(mediaBucket())
+      .upload(thumbPath, await thumbnail(sanitized.bytes), {
+        contentType: "image/webp",
+        upsert: false,
+      });
+    if (thumbResult.error) {
+      await storage().from(mediaBucket()).remove([path, thumbPath]);
+      throw new AppError(
+        503,
+        "UPLOAD_UNAVAILABLE",
+        "Не удалось сохранить миниатюру.",
+      );
+    }
     try {
       await tx`UPDATE app.media_assets SET storage_path=${path},mime_type='image/webp',byte_size=${sanitized.bytes.length},width=${sanitized.width},height=${sanitized.height},state='ready' WHERE id=${assetId}`;
     } catch (e) {
-      await storage().from(mediaBucket()).remove([path]);
+      await storage().from(mediaBucket()).remove([path, thumbPath]);
       throw e;
     }
     await storage().from(mediaBucket()).remove([asset.storage_path]);

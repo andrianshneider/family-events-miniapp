@@ -20,3 +20,20 @@ it("rejects SVG/HTML, sanitizes a real image", async () => {
   expect(out.width).toBe(4);
   expect((await sharp(out.bytes).metadata()).exif).toBeUndefined();
 });
+
+import { thumbnail } from "@/server/storage/thumbnails";
+it("creates smaller, bounded WebP thumbnails without metadata", async () => {
+  const { randomBytes } = await import("node:crypto");
+  const source = await sharp(randomBytes(1200 * 800 * 3), {
+    raw: { width: 1200, height: 800, channels: 3 },
+  })
+    .webp({ quality: 85 })
+    .toBuffer();
+  const result = await thumbnail(source),
+    meta = await sharp(result).metadata();
+  expect(meta.width).toBeLessThanOrEqual(640);
+  expect(meta.height).toBeLessThanOrEqual(384);
+  expect(meta.format).toBe("webp");
+  expect(meta.exif).toBeUndefined();
+  expect(result.length).toBeLessThan(source.length / 3);
+});

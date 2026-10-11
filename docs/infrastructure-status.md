@@ -30,3 +30,9 @@ Full acceptance remains pending real Telegram/Safari and installed iPhone PWA si
 Event creation and the private organizer event page are implemented in `infrastructure-foundation` and staging Preview (`1feb189`). Existing schema is reused; no migration was needed. Published staging creation/Storage/concurrency/ownership smoke and Slice 01 auth/infrastructure regressions passed; synthetic records and Storage files were removed. Public invitation, editing, RSVP, gifts and notifications remain later slices. Address is manual because Mapbox is not configured.
 
 See [Slice 02 verification](02-create-event-verification.md). Actual iPhone/PWA interactions and visual acceptance remain pending; source 01 Safari/Telegram return limitation is preserved.
+
+## Vertical Slice 03 — 11 October 2026
+
+Existing real event view/edit/audit were verified and extended with owner/session/CSRF/version/idempotency-protected DELETE, accessible confirmation, atomic soft delete, cross-tab invalidation and deleted-route/media protection. Migration 007 updates soft-delete service timestamps and serializes subscription consent with the event lock; 21 tables and existing restricted roles/resources remain. Implementation `d717b7f` is published on staging Preview, both GitHub CI runs and hosted auth/create-edit-delete/infrastructure checks passed; fixture cleanup completed. RSVP, Wishlist, Gifts and history are retained internally. N3 delivery, N4 rescheduling and physical retention purge remain subsequent work. Main/Production unchanged.
+
+See [Slice 03 verification and iPhone scenario](03-event-management-verification.md). Browser interaction was unavailable because its administrative policy could not be verified; physical iPhone/PWA acceptance remains manual.

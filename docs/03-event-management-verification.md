@@ -39,7 +39,17 @@
 
 Локальные tests используют actual handlers/services и PostgreSQL PGlite под fe_server. Дополнены: CSRF/owner/strict schema/version DELETE, возврат receipt/конфликт key, отсутствие повторных побочных эффектов, сохранение child history, отказ новых резервов/opt-in после удаления, реальный RSVP summary, snapshot normalization и rollback soft delete при искусственном сбое child update. Hosted smoke расширен реальными параллельными HTTP edit/delete и SQL reservation/HTTP delete, subscriber pending snapshot, отменой outbox, повтором после потерянного ответа, публичными/private/asset обложками, страницами, empty state. Fixtures ограничены текущим staging и удаляются в FK-порядке только для созданных синтетических owners, включая Storage originals/thumbnails.
 
-Результаты публикации и hosted-проверки будут добавлены после завершения. Браузерный инструмент сообщил `app-server exited before returning initialize`; интерактивные UI/реальный iPhone пока не подтверждены этим запуском.
+## Результат опубликованного staging
+
+Реализация `d717b7f320fd57fe64dc69e31e91611b4855b1e6` отправлена в `infrastructure-foundation`. Vercel Preview [AULKd3EjspeZrGxFYXhuajd51dvH](https://vercel.com/ast-dbae/family-events-miniapp/AULKd3EjspeZrGxFYXhuajd51dvH) готов; стабильный staging обслуживает новые меню и DELETE. GitHub CI push/PR завершились успешно ([push](https://github.com/andrianshneider/family-events-miniapp/actions/runs/38165471186), [PR](https://github.com/andrianshneider/family-events-miniapp/actions/runs/38165476203)). Миграция 007 применена только к `family-events-staging`; main/Production не затронуты, ресурсов не создавали.
+
+- 29 тестов в 11 файлах; typecheck, lint без warnings, build, clean migration/grants checks и secret bundle check прошли.
+- Hosted create/edit/delete: реальные DB/Storage операции, significant snapshot с действующей тестовой подпиской → pending, snapshot skip без подписчиков, trim обеих сторон, отсутствие snapshot при незначимых изменениях, точный повтор; подтверждённый soft delete, сохранение истории, отмена броней/subscriptions/pending+processing outbox; повтор после моделирования потерянного ответа; чужой owner/CSRF/версия/schema/key; private/public/asset covers 404, старые страницы/edit недоступны; настоящие параллельные edit/delete и SQL reserve/HTTP delete; empty state и SSR success; прежние проверки создания, изображений и миниатюр прошли.
+- Hosted auth: HMAC/freshness/replay, cookies, profile, empty state/pagination/ownership/refresh, expiry, CSRF, logout revocation/one-use reauth прошли. Синтетические Telegram данные не являются проверкой входа реального устройства.
+- Hosted infrastructure: HTTP health, restricted role/actual schema, private Storage и DAL rollback прошли.
+- Все три hosted-процесса завершились с кодом 0 после cleanup. Синтетические записи, связанные данные и файлы originals/thumbnails удалены; пользовательские события не использовались для мутаций. Оптимизации SSR, fra1, pagination и batch thumbnails сохранены, существующие performance tests прошли; нового замера физического iPhone/LCP нет.
+
+Интерактивный UI, ширины 375–1280, фокус/Escape/нативный Telegram Back/клавиатура/safe-area и реальная PWA в этом запуске требуют ручной приёмки. Chrome backend сообщил `app-server exited before returning initialize`; встроенный браузер отклонил доступ, потому что не смог проверить административную политику. Контроль доступа не обходили; автоматические API/DB проверки выше не выдаются за браузерный тест. Сценарий ниже позволяет завершить приёмку устройства.
 
 ## Ручная проверка iPhone
 

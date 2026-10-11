@@ -132,7 +132,7 @@ export async function completeUpload(
 }
 export async function eventCover(publicId: string) {
   const [asset] =
-    await db()`SELECT m.storage_path FROM app.events e JOIN app.media_assets m ON m.id=e.cover_asset_id WHERE e.public_id=${publicId} AND e.deleted_at IS NULL AND m.state='ready'`;
+    await db()`SELECT m.storage_path FROM app.events e JOIN app.media_assets m ON m.id=e.cover_asset_id WHERE e.public_id=${publicId} AND e.deleted_at IS NULL AND m.owner_user_id=e.organizer_id AND m.state='ready'`;
   if (!asset)
     throw new AppError(404, "MEDIA_UNAVAILABLE", "Изображение недоступно.");
   const { data, error } = await storage()

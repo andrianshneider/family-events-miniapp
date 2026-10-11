@@ -159,6 +159,12 @@ export function EventActions({
         <Link href={`/events/${id}/edit`} className="primary">
           Редактировать событие
         </Link>
+        <Link
+          href={`/events/${id}/share`}
+          className="secondary event-share-link"
+        >
+          Поделиться
+        </Link>
         <button
           ref={opener}
           className="secondary event-more"

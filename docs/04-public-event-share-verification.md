@@ -1,0 +1,60 @@
+# Срез 04 — Public Event Page → invitation link → Share
+
+12 октября 2026. Ветка `infrastructure-foundation`, существующий staging https://family-events-staging.vercel.app. Google Drive и `sources/` не изменялись. Основные источники: [инструкция](https://docs.google.com/document/d/10kmsdz5r4npcpg5MK0Yq_RgGFObfUTPpaAFT92nBvfc/edit), [PRD](https://docs.google.com/document/d/1fIecJjtJZKOtvpBx_uS6XVmKlwi6Fm-hUxmdbODAzRE/edit), [Technical Specification](https://docs.google.com/document/d/1HrYTqMQAW-82OZBLHN9VO3JrNzccGqR0QgHjMYiU39o/edit), актуальные spec/HTML 08 и 19, экран 04, аудит экранов, local verification/performance reports предыдущих срезов.
+
+## Аудит исходного состояния
+
+| Критерий | Уже реализовано | Подтверждение | Работа среза |
+|---|---|---|---|
+| Постоянная ссылка | 128-bit random public_id, immutable DB trigger | foundation/service create/edit | canonical URL + owner-only Share |
+| Public read | только public cover | route/media service | explicit sanitized PublicEventDTO, SSR /e/{publicId}, public API |
+| Privacy | закрытая app schema, RLS/restricted role/private Storage | migrations + DB/security tests | no users/guest/reservation data in public DTO/HTML/metadata |
+| OG/noindex | global robots metadata/header; robots disallow all | layout/next.config/robots | dynamic metadata, real 1200×630 PNG, crawler access with noindex retained |
+| Copy/Share | demo HTML only | prototypes 08/19 | real Clipboard/Web Share/Telegram URL |
+| Delete | atomic soft delete and owner/media filters | slice03 implementation/report | close public page/API/cover/OG/Share after delete |
+| Performance | SSR owner list/fra1/batch thumbnails | performance report/tests | preserved, public SSR has no initial login/me waterfall |
+
+## Реализация
+
+- `/e/{publicId}` SSR и `/api/v1/public/events/{publicId}` не требуют ни Organizer, ни Guest сессии; просроченная/чужая cookie не меняет public read. GET не вызывает guest session/login и не создаёт identities. Rate limiter пишет только существующий operational counter, без бизнес-мутаций.
+- Public DTO явно содержит publicId, title/type/date/time/timezone/isPast, optional venue/address/directions/description/dress, version, event-specific coverUrl и безопасный routeUrl. Нет внутренних event/asset/user/guest IDs, профиля организатора, контактов, RSVP и reservation identities. Public SQL не присоединяет users/guests/reservations. User text экранируется React и XML при OG render; HTML пользователя не исполняется.
+- Optional пустые строки нормализуются в null; только заполненные блоки. Нативное время Event сохраняется, без пересчёта в timezone гостя. Past — existing effective_at. Без обложки — нейтральная область с символом бренда, без тестовой фотографии.
+- Маршрут только с непустым адресом; сохранённая пара coordinates предпочтительна, иначе адрес. Fixed HTTPS Google Maps search origin, URLSearchParams; new tab с noopener/noreferrer и label. Геолокация/геокодирование/новые ресурсы отсутствуют.
+- `/events/{id}/share` и `/api/v1/events/{id}/share` проверяют серверную сессию, UUID и owner/deleted filter. Canonical URL формируется только из server APP_URL + existing public_id; Host/query public_url не являются источником данных. URL не меняется после edit, не содержит UUID/credentials и не является персональным приглашением. Возврат после login allowlist расширен только точным /events/{uuid}/share.
+- Screen 19 показывает real preview, readonly URL, copy/share/Telegram fallback и возврат. Clipboard вызывается из click; success только после завершения; failure/unsupported выделяет URL для ручного copy. Native navigator.share вызывается до первого await (title/text/url уже загружены), AbortError = cancel, unsupported/error имеют fallback. Нет утверждения о доставке. Focus возвращается после завершения action и снятия disabled.
+- Mini App uses SDK openTelegramLink(t.me/share/url), Browser/PWA native Share и отдельный HTTPS Telegram fallback. [Telegram Share docs](https://core.telegram.org/widgets/share) и [Mini Apps docs](https://core.telegram.org/bots/webapps) проверены. shareMessage требует заранее сохранённый PreparedInlineMessage; новый server-prepared flow не внедряется, используется разрешённый заданием fallback. Нет вызовов Bot API/автоматических сообщений/имитации prepared message. Canonical HTTPS открывается в Telegram browser как обычная guest page, без login; отдельный startapp routing здесь не требуется.
+- Loading/background error/offline/unavailable показаны текстом, aria-busy/alert/status; загруженные сведения не стираются при сетевой ошибке. Первичный документ отдаётся целиком SSR без loading boundary, чтобы unknown/deleted Event сохранял HTTP 404 до streaming. Во время ожидания документа действует обычный индикатор навигации браузера. Public background read каждые 30s при visible, Share 15s; visibility/pageshow/online и cross-tab hints перечитывают сервер. Никакого нового initial client fetch. Offline cold load не выдумывает сохранённые данные; Copy ранее загруженного canonical URL разрешён, отправка disabled. Подтверждённая 404 скрывает сведения/действия; Share 401 возвращает к login.
+
+## OG, cache, noindex
+
+- generateMetadata читает real Event на сервере; title/date/time, canonical, OG website/title/description/url/image и Twitter summary_large_image в начальном head для всех User-Agent (`htmlLimitedBots`). Нет гостевых/организаторских персональных полей.
+- `/api/v1/public/events/{publicId}/og?v={version}` возвращает настоящий PNG 1200×630: title/date/Event timezone, real cover либо brand fallback. URL постоянного endpoint, без signed credentials/TTL в metadata. Запрошенная старая v не обходит доступность и не возвращает старый cached Event; current DB state решает доступность. Cover/OG доступны crawler без cookies, private bucket не открывали.
+- OG скачивает только ready asset, связанный с текущим Event, через Storage service; нет fetch arbitrary URL. XML escapes prevent SVG injection. Public cover resized max1600×960 WebP, strips metadata, bounded response below large-original serverless risk. OG реальные размеры проверены sharp; локальные synthetic OG inspected визуально.
+- Public metadata/page используют request-local React cache для общего чтения/лимита, не shared cache Event. Все public APIs/images — no-store; SSR force-dynamic. Version suffix обновляет image URL после edit, canonical URL тот же. Public read limiter существующий distributed, 120/min/IP configured, работает и для page/media.
+- robots сохраняет Disallow / для прочих routes и Allow /e/ + /api/v1/public/events/ для чтения metadata/social image. HTML robots и X-Robots-Tag noindex,nofollow остаются, sitemap не создан. noindex требует соблюдения crawler, это не контроль доступа. Referrer-Policy no-referrer и safe external links сохранены.
+- Unknown/invalid/deleted Event page и Public API — safe 404; UI «Это мероприятие недоступно», уточнить ссылку, без регистрации. Недоступная metadata generic без старого Event/OG. После delete cover/OG/Share перестают выдавать сведения. Уже выданные signed URLs и external cached previews живут по TTL/политике платформы; мгновенный отзыв/обновление внешних копий не обещается. Purge и удаление пользовательских файлов не запускаются.
+
+## Границы дизайна и работы
+
+RSVP, own guest context, wishlist preview/navigation, reservations и opt-in ещё не реализованы пользовательскими API этого среза. В полном 08 они есть, но здесь скрыты; фиктивных ответов/подарков/неработающих кнопок нет. Пока этих блоков нет, Public page — одна полноценная колонка вместо пустой правой колонки desktop; Share на desktop две колонки, на mobile одна. CSS сохраняет existing typography/colors/safe-area, touch targets, focus/reduced motion; исправление центрирования ••• не откатывается. Analytics funnel/event_opened/event_shared endpoint не добавлялся; preview bots не создают guests/analytics, текущие application logs имеют только numeric operational fields и requestId, без invitation URL/PII.
+
+Нет новой миграции, таблицы/DB role/bucket/bot/project; используются существующие 21 таблица и 7 migrations. Main/Production unchanged. Последняя проверка GUI была недоступна: tool could not verify admin-enforced policy. Не обходили browser controls. Моки platform API и HTTP/DB не являются проверкой физического iPhone/share sheet/доставки.
+
+## Проверки и публикация
+
+Результаты hosted/CI будут записаны после публикации. `tests/public-event.test.ts` выполняет actual services/handlers/metadata/pages с PostgreSQL PGlite под fe_server: minimal/full/unsafe text, own/foreign/revoked session, no identity creation, public DTO allowlist, no private markers, metadata/canonical, cover/fallback OG, unchanged URL, unavailable после delete, public limiter. `tests/share-actions.test.ts` проверяет synchronous platform calls, delayed Clipboard completion, rejection/manual fallback path, share cancellation/error/unsupported и canonical Telegram/maps URL. Existing auth/create/edit/delete/performance tests сохраняются.
+
+Hosted staging smoke расширен в `scripts/create-event-smoke.ts`: реальные creation/edit/Storage, real public HTML/metadata/API без cookies и с expired cookie, no Set-Cookie, no private markers, owner-only Share, canonical query poisoning rejection, protected redirects, real OG+cover, noindex/robots, unknown/deleted 404 и закрытие share. Fixtures limited staging, runtime role checked, cleanup only synthetic verified owners and their originals/thumbnails/children. Auth/infrastructure regressions также выполнить.
+
+## Ручная проверка iPhone после публикации
+
+1. В Mini App откройте своё тестовое событие → «Поделиться». Ожидание: настоящий preview и постоянная staging /e/ ссылка, без demo.
+2. «Скопировать ссылку», вставить в Safari Private либо браузер без входа. Ожидание: «Ссылка скопирована», событие открывается без Telegram login/регистрации, точные данные.
+3. Повторить с минимальным событием без optional fields/cover. Ожидание: нейтральная обложка, нет пустого адреса/маршрута/описаний и фиктивного RSVP/wishlist.
+4. Для события с адресом открыть «Построить маршрут». Ожидание: карты с сохранённым адресом/координатами; возврат к приглашению возможен. Повторить внутри Telegram browser.
+5. В Safari и установленной PWA нажать «Поделиться». Ожидание: системный share sheet с тем же URL. Отмена не показывает ошибку/«отправлено»; ссылка не меняется. Если API отсутствует — copy/Telegram fallback.
+6. В Mini App выбрать «Поделиться»/Telegram fallback; вручную отправить в «Избранное» либо тестовый чат. Ожидание: выбор чата и обычная HTTPS ссылка. Открытие полученной ссылки внутри Telegram показывает guest page без регистрации.
+7. Проверить реальное link preview в Telegram и другом доступном мессенджере: title/date/time/cover или brand fallback, без контактов и гостевых данных. Первый fetch/обновление может зависеть от кеша платформы; API/SSR результат проверен отдельно.
+8. Изменить дату/время/место/cover у Organizer, сохранить, вернуться Share и открыть прежний URL. Ожидание: URL тот же, актуальное Event и server preview. Внешний уже отправленный preview может оставаться cached.
+9. Удалить только тестовое событие. Открыть старый public URL в новом окне/после refresh. Ожидание: «Это мероприятие недоступно», без Event/изображения/login. В ранее открытой странице возврат/online refresh также закрывает сведения.
+10. Проверить узкие экраны, длинное название/URL, увеличение текста, safe-area, keyboard focus/VoiceOver. Copy failure/manual selection, Telegram/PWA actual share sheet и real cached preview остаются ручными пунктами; не отправляйте токены/cookies/initData для проверки.

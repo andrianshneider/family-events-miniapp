@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
   poweredByHeader: false,
+  // Public invitation metadata must be present in initial HTML for all link previews.
+  htmlLimitedBots: /.*/,
   outputFileTracingIncludes: { "/*": ["./certs/*.crt"] },
   async redirects() {
     return [

@@ -624,6 +624,155 @@ try {
     countBefore.count,
   );
   phase =
+    "slice04 public SSR, sanitized projection, canonical invitation and OG";
+  const publicPath = `/e/${fullEvent.publicId}`;
+  const publicApi = `/api/v1/public/events/${fullEvent.publicId}`;
+  const anonymous = (path: string, init: RequestInit = {}) =>
+    fetchWithTimeout(root + path, init);
+  const publicResponse = await anonymous(publicApi);
+  assert.equal(publicResponse.status, 200);
+  assert.equal(publicResponse.headers.getSetCookie().length, 0);
+  const publicDto = (await publicResponse.json()).data;
+  assert.equal(publicDto.title, insignificantFields.title);
+  assert.equal(publicDto.startTime, "19:00");
+  assert.equal(publicDto.timezone, "Europe/Moscow");
+  const mapUrl = new URL(publicDto.routeUrl);
+  assert.equal(mapUrl.origin, "https://www.google.com");
+  assert.equal(mapUrl.searchParams.get("query"), newFields.address);
+  const htmlResponse = await anonymous(
+    publicPath + "?public_url=https://attacker.test",
+  );
+  assert.equal(htmlResponse.status, 200);
+  assert.equal(htmlResponse.headers.getSetCookie().length, 0);
+  assert(htmlResponse.headers.get("cache-control")?.includes("no-store"));
+  assert(htmlResponse.headers.get("x-robots-tag")?.includes("noindex"));
+  assert.equal(htmlResponse.headers.get("referrer-policy"), "no-referrer");
+  const publicHtml = await htmlResponse.text();
+  const head = publicHtml.slice(0, publicHtml.indexOf("</head>"));
+  assert(
+    head.includes('property="og:title"') &&
+      head.includes(insignificantFields.title),
+  );
+  assert(
+    head.includes('property="og:image"') &&
+      head.includes(`/og?v=${publicDto.version}`),
+  );
+  assert(
+    head.includes("summary_large_image") &&
+      head.includes("noindex") &&
+      head.includes('rel="canonical"'),
+  );
+  assert(
+    publicHtml.includes("Построить маршрут") &&
+      publicHtml.includes(newFields.address),
+  );
+  for (const privateValue of [
+    owner.id,
+    other.id,
+    guest.id,
+    gift.id,
+    wishlist.id,
+    "Slice03 guest",
+    "Slice02 smoke",
+  ]) {
+    assert(!publicHtml.includes(privateValue));
+    assert(!JSON.stringify(publicDto).includes(privateValue));
+  }
+  const [sessionCount] =
+    await sql`SELECT count(*)::int AS count FROM app.guest_sessions WHERE guest_identity_id=${guest.id}`;
+  assert.equal(sessionCount.count, 0);
+  const [ownSession] =
+    await sql`SELECT id,expires_at,created_at FROM app.organizer_sessions WHERE token_hash=${createHash("sha256").update(owner.cookie.split("=")[1]).digest()}`;
+  await sql`UPDATE app.organizer_sessions SET created_at=now()-interval '31 days',expires_at=now()-interval '1 second' WHERE id=${ownSession.id}`;
+  assert.equal(
+    (await anonymous(publicPath, { headers: { Cookie: owner.cookie } })).status,
+    200,
+  );
+  assert.equal(
+    (await anonymous(publicApi, { headers: { Cookie: owner.cookie } })).status,
+    200,
+  );
+  await sql`UPDATE app.organizer_sessions SET created_at=${ownSession.created_at},expires_at=${ownSession.expires_at} WHERE id=${ownSession.id}`;
+  const shareApi = `/api/v1/events/${fullEvent.id}/share`,
+    sharePath = `/events/${fullEvent.id}/share`;
+  assert.equal((await anonymous(shareApi)).status, 401);
+  assert.equal((await request(other, shareApi)).status, 404);
+  const invite = (await (await request(owner, shareApi)).json()).data;
+  assert.equal(invite.publicUrl, root + publicPath);
+  assert.deepEqual(invite.event, publicDto);
+  const hostileInvite = (
+    await (
+      await request(owner, shareApi + "?public_url=https://attacker.test")
+    ).json()
+  ).data;
+  assert.equal(hostileInvite.publicUrl, root + publicPath);
+  const shareHtml = await (await request(owner, sharePath)).text();
+  assert(
+    shareHtml.includes("Скопировать ссылку") &&
+      shareHtml.includes("Поделиться") &&
+      shareHtml.includes(root + publicPath),
+  );
+  const otherShare = await (await request(other, sharePath)).text();
+  assert(
+    otherShare.includes("Событие недоступно") &&
+      !otherShare.includes(insignificantFields.title),
+  );
+  const shareWithoutLogin = await anonymous(sharePath, { redirect: "manual" });
+  assert.equal(shareWithoutLogin.status, 307);
+  assert.equal(
+    new URL(shareWithoutLogin.headers.get("location")!, root).searchParams.get(
+      "returnTo",
+    ),
+    sharePath,
+  );
+  const og = await anonymous(
+    `/api/v1/public/events/${fullEvent.publicId}/og?v=${publicDto.version}`,
+    { headers: { "User-Agent": "TelegramBot (like TwitterBot)" } },
+  );
+  assert.equal(og.status, 200);
+  assert.equal(og.headers.get("content-type"), "image/png");
+  const ogMeta = await sharp(Buffer.from(await og.arrayBuffer())).metadata();
+  assert.equal(ogMeta.format, "png");
+  assert.equal(ogMeta.width, 1200);
+  assert.equal(ogMeta.height, 630);
+  const coverPublic = await anonymous(publicDto.coverUrl);
+  assert.equal(coverPublic.status, 200);
+  const coverPublicMeta = await sharp(
+    Buffer.from(await coverPublic.arrayBuffer()),
+  ).metadata();
+  assert.equal(coverPublicMeta.format, "webp");
+  assert(coverPublicMeta.width! <= 1600 && coverPublicMeta.height! <= 960);
+  const minimalPublic = (
+    await (await anonymous(`/api/v1/public/events/${event.publicId}`)).json()
+  ).data;
+  assert.equal(minimalPublic.coverUrl, null);
+  assert.equal(minimalPublic.routeUrl, null);
+  assert.equal(minimalPublic.startTime, null);
+  const minimalHtml = await (await anonymous(`/e/${event.publicId}`)).text();
+  assert(!minimalHtml.includes("Построить маршрут"));
+  assert(!minimalHtml.includes("Дресс-код"));
+  assert(!minimalHtml.includes("Ответы гостей"));
+  const fallbackOg = await anonymous(
+    `/api/v1/public/events/${event.publicId}/og`,
+  );
+  assert.equal(fallbackOg.status, 200);
+  assert.equal(
+    (await sharp(Buffer.from(await fallbackOg.arrayBuffer())).metadata()).width,
+    1200,
+  );
+  const robots = await (await anonymous("/robots.txt")).text();
+  assert(
+    robots.includes("Allow: /e/") &&
+      robots.includes("Allow: /api/v1/public/events/"),
+  );
+  assert(!robots.includes("Sitemap:"));
+  for (const id of ["bad", "x".repeat(22)]) {
+    const invalidPage = await anonymous("/e/" + id);
+    assert.equal(invalidPage.status, 404);
+    assert((await invalidPage.text()).includes("Это мероприятие недоступно"));
+    assert.equal((await anonymous("/api/v1/public/events/" + id)).status, 404);
+  }
+  phase =
     "slice03 delete confirmation markup, transaction and repeated receipt";
   const manageHtml = await (
     await request(owner, `/events/${fullEvent.id}`)
@@ -721,6 +870,19 @@ try {
       .status,
     404,
   );
+  phase = "slice04 deleted public page, OG and Share";
+  for (const path of [
+    publicApi,
+    `/api/v1/public/events/${fullEvent.publicId}/og?v=${publicDto.version}`,
+    shareApi,
+  ])
+    assert.equal((await request(owner, path)).status, 404);
+  const deletedPublic = await fetchWithTimeout(root + publicPath);
+  assert.equal(deletedPublic.status, 404);
+  const deletedPublicHtml = await deletedPublic.text();
+  assert(deletedPublicHtml.includes("Это мероприятие недоступно"));
+  assert(!deletedPublicHtml.includes(insignificantFields.title));
+  assert(!deletedPublicHtml.includes('property="og:image"'));
   const [soft] =
     await sql`SELECT deleted_at,updated_at,version FROM app.events WHERE id=${fullEvent.id}`;
   assert(soft.deleted_at);
@@ -944,7 +1106,7 @@ try {
       !deletedHtml.includes(minimal.title),
   );
   console.info(
-    "PASS: staging Slice03 soft deletion, retained history, cancelled reservations/subscriptions/outbox, version conflict, idempotent receipt after lost response, real parallel edit/delete and reservation/delete, empty state, closed private/public covers; creation and editing, minimal/full event + wishlist, cover replacement/removal, CSRF, validation, idempotency, concurrent version conflict, DB persistence, refresh, private pages, actual Storage upload/EXIF removal, owner isolation, expiry and edit auth returnTo. Browser interaction and iPhone checks remain manual.",
+    "PASS: staging Slice04 public SSR and safe DTO without cookies, no identity creation, route, privacy, canonical owner-only Share, expired-cookie anonymous access, real OG cover/fallback, noindex, deleted public routes; Slice03 soft deletion, retained history, cancelled reservations/subscriptions/outbox, version conflict, idempotent receipt after lost response, real parallel edit/delete and reservation/delete, empty state, closed private/public covers; creation and editing, minimal/full event + wishlist, cover replacement/removal, CSRF, validation, idempotency, concurrent version conflict, DB persistence, refresh, private pages, actual Storage upload/EXIF removal, owner isolation, expiry and edit auth returnTo. Browser interaction and iPhone checks remain manual.",
   );
 } catch {
   console.error(

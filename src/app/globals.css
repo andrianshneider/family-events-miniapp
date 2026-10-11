@@ -555,3 +555,117 @@ a:focus-visible {
 .delete-event-name {
   overflow-wrap: anywhere;
 }
+
+.public-shell,
+.share-shell {
+  max-width: 1040px;
+  width: 100%;
+  padding-bottom: max(32px, env(safe-area-inset-bottom));
+}
+.public-shell {
+  max-width: 840px;
+}
+.public-information {
+  margin-top: 24px;
+}
+.public-cover {
+  height: 240px;
+  background: #f5efff;
+}
+.public-date {
+  font-size: 18px;
+  font-weight: 500;
+}
+.public-venue {
+  margin-top: 24px !important;
+}
+.route-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  margin-top: 16px;
+}
+.public-footer {
+  color: #716879;
+  font-size: 13px;
+  padding-top: 32px;
+}
+.invitation-layout {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+  align-items: start;
+}
+.invitation-preview h2 {
+  overflow-wrap: anywhere;
+}
+.invitation-controls {
+  min-width: 0;
+}
+.public-link {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #e6dfe9;
+  border-radius: 12px;
+  padding: 14px;
+  font: inherit;
+  font-size: 16px;
+  margin-top: 8px;
+}
+.invitation-buttons {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0 12px;
+}
+.invitation-buttons .primary {
+  margin: 0;
+}
+.telegram-share {
+  display: inline-flex;
+  align-items: center;
+}
+.telegram-share[aria-disabled="true"] {
+  opacity: 0.6;
+}
+.event-share-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  min-width: 0;
+}
+@media (max-width: 599px) {
+  .event-actions {
+    flex-wrap: wrap;
+  }
+  .event-actions .primary {
+    flex-basis: calc(100% - 64px);
+  }
+  .event-actions .event-more {
+    order: 1;
+  }
+  .event-actions .event-share-link {
+    order: 2;
+    width: 100%;
+  }
+}
+@media (min-width: 768px) {
+  .public-cover {
+    height: 340px;
+  }
+  .invitation-buttons {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (min-width: 1024px) {
+  .invitation-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .invitation-buttons {
+    grid-template-columns: 1fr;
+  }
+  .invitation-preview .public-cover {
+    height: 260px;
+  }
+}

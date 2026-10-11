@@ -216,12 +216,12 @@ export function EventScreen({
           <section className="panel">
             <h2>Пригласите близких</h2>
             <p className="muted">
-              Приглашения скоро появятся. Вы сможете поделиться одной ссылкой на
-              событие.
+              Отправьте близким ссылку на событие. Приглашение откроется без
+              регистрации.
             </p>
-            <button className="primary" disabled>
+            <Link className="primary" href={`/events/${event.id}/share`}>
               Пригласить гостей
-            </button>
+            </Link>
           </section>
         </aside>
       </div>

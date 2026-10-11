@@ -11,9 +11,11 @@ type Event = Awaited<ReturnType<typeof organizerEvent>>;
 export function EventScreen({
   initialEvent,
   created,
+  updated = false,
 }: {
   initialEvent: Event;
   created: boolean;
+  updated?: boolean;
 }) {
   const router = useRouter();
   const heading = useRef<HTMLHeadingElement>(null);
@@ -88,6 +90,14 @@ export function EventScreen({
           Событие создано
         </p>
       )}
+      {updated && (
+        <p className="notice success" role="status">
+          Изменения сохранены
+        </p>
+      )}
+      <Link href={`/events/${event.id}/edit`} className="primary">
+        Редактировать событие
+      </Link>
       {error && (
         <div className="notice error" role="alert">
           {error}

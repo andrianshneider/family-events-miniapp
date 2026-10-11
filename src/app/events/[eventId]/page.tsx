@@ -10,7 +10,7 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ eventId: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; updated?: string }>;
 }) {
   const parsed = z.uuid().safeParse((await params).eventId);
   if (!parsed.success) notFound();
@@ -27,6 +27,7 @@ export default async function EventPage({
       key={event.id}
       initialEvent={event}
       created={(await searchParams).created === "1"}
+      updated={(await searchParams).updated === "1"}
     />
   );
 }

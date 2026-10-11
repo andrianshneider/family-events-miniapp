@@ -12,8 +12,7 @@ import {
 import { eventDateLabel, eventTypes } from "./event-presentation";
 import { TelegramBack } from "./telegram-back";
 import { OrganizerHeader } from "./organizer-header";
-const storageKey = "fe-create-event-form-v1";
-function removeSaved() {
+function clearSaved(storageKey: string) {
   try {
     localStorage.removeItem(storageKey);
   } catch {
@@ -92,11 +91,27 @@ const groups: {
 export function CreateEventScreen({
   userId,
   displayName,
+  editing,
 }: {
   userId: string;
   displayName: string;
+  editing?: {
+    id: string;
+    version: number;
+    fields: Fields;
+    latitude: number | null;
+    longitude: number | null;
+  };
 }) {
   const router = useRouter();
+  const storageKey = editing
+    ? `fe-edit-event-${editing.id}-v${editing.version}`
+    : "fe-create-event-form-v1";
+  const backTo = editing ? `/events/${editing.id}` : "/events";
+  const loginPath =
+    "/login?returnTo=" +
+    encodeURIComponent(editing ? `/events/${editing.id}/edit` : "/events/new");
+  const removeSaved = useCallback(() => clearSaved(storageKey), [storageKey]);
   const [fields, setFields] = useState(empty);
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const attemptRef = useRef<Attempt | null>(null);
@@ -131,10 +146,10 @@ export function CreateEventScreen({
         /* The current form remains in memory when browser storage is unavailable. */
       }
     },
-    [userId],
+    [userId, storageKey],
   );
   useEffect(() => {
-    let value = {
+    let value = editing?.fields ?? {
       ...empty,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     };
@@ -169,7 +184,7 @@ export function CreateEventScreen({
           persist(fieldsRef.current, attemptRef.current);
           allowExit.current = true;
           window.location.assign(
-            new URL("/login?returnTo=/events/new", window.location.origin).href,
+            new URL(loginPath, window.location.origin).href,
           );
         } else if (response.ok && (await response.json()).data.id !== userId) {
           removeSaved();
@@ -188,9 +203,11 @@ export function CreateEventScreen({
       window.removeEventListener("offline", network);
       document.removeEventListener("visibilitychange", restore);
     };
-  }, [userId, persist]);
-  const dirty = Object.entries(fields).some(
-    ([key, value]) => key !== "timezone" && value !== "",
+  }, [userId, persist, editing, loginPath, removeSaved, storageKey]);
+  const dirty = Object.entries(fields).some(([key, value]) =>
+    editing
+      ? value !== editing.fields[key as keyof Fields]
+      : key !== "timezone" && value !== "",
   );
   useEffect(() => {
     const before = (event: BeforeUnloadEvent) => {
@@ -214,21 +231,19 @@ export function CreateEventScreen({
     if (dialog.current?.open) return;
     if (attempt) {
       setError(
-        "Результат создания пока неизвестен. Сначала нажмите «Проверить создание», чтобы исключить повторное событие.",
+        "Результат сохранения пока неизвестен. Сначала проверьте результат, чтобы исключить повторную отправку.",
       );
       return;
     }
     if (dirty) {
       cancelSource.current = document.activeElement as HTMLElement;
       dialog.current?.showModal();
-    } else router.push("/events");
+    } else router.push(backTo);
   }
   function requireLogin() {
     persist(fieldsRef.current, attempt);
     allowExit.current = true;
-    window.location.assign(
-      new URL("/login?returnTo=/events/new", window.location.origin).href,
-    );
+    window.location.assign(new URL(loginPath, window.location.origin).href);
   }
   async function csrfToken() {
     const profile = await fetch("/api/v1/me", {
@@ -363,27 +378,44 @@ export function CreateEventScreen({
       setAttempt(current);
       attemptRef.current = current;
       persist(fields, current);
-      const response = await fetch("/api/v1/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": csrf,
-          "idempotency-key": current.key,
+      const response = await fetch(
+        editing ? `/api/v1/events/${editing.id}` : "/api/v1/events",
+        {
+          method: editing ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-csrf-token": csrf,
+            "idempotency-key": current.key,
+          },
+          body: JSON.stringify(
+            editing
+              ? {
+                  expectedVersion: editing.version,
+                  fields: {
+                    ...current.payload,
+                    latitude: editing.latitude,
+                    longitude: editing.longitude,
+                  },
+                }
+              : current.payload,
+          ),
+          signal: AbortSignal.timeout(20000),
         },
-        body: JSON.stringify(current.payload),
-        signal: AbortSignal.timeout(20000),
-      });
+      );
       const result = await response.json();
       if (response.status === 401) {
         persist(fields, current);
         allowExit.current = true;
-        window.location.assign(
-          new URL("/login?returnTo=/events/new", window.location.origin).href,
-        );
+        window.location.assign(new URL(loginPath, window.location.origin).href);
         return;
       }
       if (!response.ok) {
-        if ([403, 422, 429].includes(response.status)) {
+        if (
+          [403, 404, 422, 429].includes(response.status) ||
+          (editing &&
+            response.status === 409 &&
+            result.error?.code === "VERSION_CONFLICT")
+        ) {
           setAttempt(null);
           attemptRef.current = null;
           persist(fields, null);
@@ -399,12 +431,14 @@ export function CreateEventScreen({
           ?.focus();
         throw Error(
           result.error?.message ??
-            "Не удалось создать событие. Повторите проверку.",
+            "Не удалось сохранить событие. Повторите проверку.",
         );
       }
       removeSaved();
       allowExit.current = true;
-      window.location.replace(`/events/${result.data.id}?created=1`);
+      window.location.replace(
+        `/events/${result.data.id}?${editing ? "updated" : "created"}=1`,
+      );
     } catch (caught) {
       setError(
         caught instanceof Error && caught.name === "Error"
@@ -429,13 +463,15 @@ export function CreateEventScreen({
         onClick={leave}
         disabled={pending || uploading}
       >
-        ← Мои события
+        {editing ? "← Моё событие" : "← Мои события"}
       </button>
       <h1 ref={heading} tabIndex={-1}>
-        Создать событие
+        {editing ? "Редактировать событие" : "Создать событие"}
       </h1>
       <p className="muted">
-        Соберите близких в один день.
+        {editing
+          ? "Измените сведения и сохраните результат."
+          : "Соберите близких в один день."}
         <br />
         Обязательно только название, тип и дата.
       </p>
@@ -450,10 +486,33 @@ export function CreateEventScreen({
           {error}
         </p>
       )}
+      {editing && error && (
+        <button
+          className="secondary"
+          disabled={pending || uploading}
+          onClick={() => {
+            if (attempt) {
+              setError("Сначала нажмите «Проверить сохранение».");
+              return;
+            }
+            if (
+              !window.confirm(
+                "Загрузить актуальную версию? Несохранённые изменения будут потеряны.",
+              )
+            )
+              return;
+            removeSaved();
+            allowExit.current = true;
+            window.location.reload();
+          }}
+        >
+          Загрузить актуальную версию
+        </button>
+      )}
       {attempt && !pending && (
         <p className="notice" role="status">
           Сначала проверим результат предыдущего запроса. Изменение формы
-          временно недоступно, чтобы не создать дубликат.
+          временно недоступно, чтобы безопасно проверить сохранение.
         </p>
       )}
       <form
@@ -508,7 +567,10 @@ export function CreateEventScreen({
                         type="button"
                         className="text-button"
                         disabled={locked || uploading}
-                        onClick={() => change("coverAssetId", "")}
+                        onClick={() => {
+                          setCoverError("");
+                          change("coverAssetId", "");
+                        }}
                       >
                         Удалить
                       </button>
@@ -595,7 +657,9 @@ export function CreateEventScreen({
                     />
                   )}
                   <p id={`${field.key}-hint`} className="hint">
-                    {field.hint}
+                    {editing && field.key === "eventDate"
+                      ? "Можно редактировать и прошедшее событие"
+                      : field.hint}
                   </p>
                   <p id={`${field.key}-error`} className="error">
                     {fieldErrors[field.key]?.[0]}
@@ -660,10 +724,16 @@ export function CreateEventScreen({
           }
         >
           {pending
-            ? "Создаём событие…"
+            ? editing
+              ? "Сохраняем изменения…"
+              : "Создаём событие…"
             : attempt
-              ? "Проверить создание"
-              : "Создать событие"}
+              ? editing
+                ? "Проверить сохранение"
+                : "Проверить создание"
+              : editing
+                ? "Сохранить изменения"
+                : "Создать событие"}
         </button>
       </footer>
       <dialog
@@ -678,14 +748,14 @@ export function CreateEventScreen({
           autoFocus
           onClick={() => dialog.current?.close()}
         >
-          Продолжить создание
+          {editing ? "Продолжить редактирование" : "Продолжить создание"}
         </button>
         <button
           className="secondary"
           onClick={() => {
             removeSaved();
             allowExit.current = true;
-            router.push("/events");
+            router.push(backTo);
           }}
         >
           Выйти без сохранения

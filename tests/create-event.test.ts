@@ -30,7 +30,11 @@ vi.mock("next/navigation", () => ({
 }));
 import { POST as miniLogin } from "@/app/api/auth/telegram/mini-app/route";
 import { POST as create, GET as list } from "@/app/api/v1/events/route";
-import { GET as detail } from "@/app/api/v1/events/[eventId]/route";
+import {
+  GET as detail,
+  PATCH as update,
+} from "@/app/api/v1/events/[eventId]/route";
+import EditPage from "@/app/events/[eventId]/edit/page";
 import EventPage from "@/app/events/[eventId]/page";
 import { csrf } from "@/server/auth/crypto";
 import { returnPath } from "@/server/telegram/oidc";
@@ -129,6 +133,30 @@ it("creates real events atomically and enforces validation, idempotency and owne
     detail(new Request("https://example.test/api/v1/events/" + id), {
       params: Promise.resolve({ eventId: id }),
     });
+  const patch = (
+    id: string,
+    fields: unknown,
+    expectedVersion = 1,
+    key = "key-edit-event-00001",
+    withCsrf = true,
+  ) =>
+    update(
+      new Request("https://example.test/api/v1/events/" + id, {
+        method: "PATCH",
+        headers: {
+          Origin: "https://example.test",
+          "Content-Type": "application/json",
+          "Idempotency-Key": key,
+          ...(withCsrf
+            ? {
+                "x-csrf-token": csrf(bridge.cookies.get("__Host-fe_org") ?? ""),
+              }
+            : {}),
+        },
+        body: JSON.stringify({ fields, expectedVersion }),
+      }),
+      { params: Promise.resolve({ eventId: id }) },
+    );
   try {
     await pg.exec("CREATE ROLE anon; CREATE ROLE authenticated;");
     for (const file of (await readdir("supabase/migrations"))
@@ -303,7 +331,127 @@ it("creates real events atomically and enforces validation, idempotency and owne
     expect(pair.map((response) => response.status)).toEqual([201, 201]);
     expect((await pair[0].json()).data).toEqual((await pair[1].json()).data);
     expect(await query`SELECT id FROM app.events`).toHaveLength(3);
+    const editPage = await EditPage({
+      params: Promise.resolve({ eventId: second.id }),
+    });
+    expect(editPage.props.editing.fields.coverAssetId).toBe(pendingAsset.id);
+    expect(editPage.props.editing.version).toBe(1);
+    expect(
+      (await patch(second.id, full, 1, "key-edit-csrf-00001", false)).status,
+    ).toBe(403);
+    expect(
+      (await patch(second.id, { ...full, organizerId: "forged" })).status,
+    ).toBe(422);
+    expect((await patch(second.id, { ...full, endTime: "17:00" })).status).toBe(
+      422,
+    );
+    expect(
+      (
+        await patch(second.id, {
+          ...full,
+          eventDate: "2030-03-31",
+          timezone: "Europe/Berlin",
+          startTime: "02:30",
+        })
+      ).status,
+    ).toBe(422);
+    expect(
+      (await patch(second.id, { ...full, coverAssetId: asset.id })).status,
+    ).toBe(422);
+    bridge.cookies.set("__Host-fe_org", other.raw);
+    expect((await patch(second.id, full)).status).toBe(404);
+    await expect(
+      EditPage({ params: Promise.resolve({ eventId: second.id }) }),
+    ).rejects.toThrow("TEST_NOT_FOUND");
+    bridge.cookies.set("__Host-fe_org", owner.raw);
+    const changed = {
+      ...full,
+      title: "Обновлённое событие",
+      venueName: "Новое место",
+      coverAssetId: null,
+    };
+    const saved = await patch(second.id, changed);
+    expect(saved.status).toBe(200);
+    const edited = (await saved.json()).data;
+    expect(edited.version).toBe(2);
+    expect(edited.changeId).toBeTruthy();
+    expect((await (await patch(second.id, changed)).json()).data).toEqual(
+      edited,
+    );
+    expect((await (await get(second.id)).json()).data).toMatchObject({
+      title: changed.title,
+      coverUrl: null,
+      version: 2,
+    });
+    expect(
+      (await patch(second.id, full, 1, "key-edit-stale-00001")).status,
+    ).toBe(409);
+    const [record] =
+      await query`SELECT changes,notify_decision FROM app.event_changes WHERE event_id=${second.id}`;
+    expect(record).toMatchObject({
+      changes: { venueName: { before: "Дом", after: "Новое место" } },
+      notify_decision: "skip",
+    });
+    expect(
+      await query`SELECT id FROM app.wishlists WHERE event_id=${second.id}`,
+    ).toHaveLength(1);
+    expect(
+      (
+        await patch(
+          second.id,
+          {
+            ...changed,
+            eventDate: "2020-01-01",
+            coverAssetId: pendingAsset.id,
+          },
+          2,
+          "key-edit-past-00001",
+        )
+      ).status,
+    ).toBe(200);
+    expect((await (await get(second.id)).json()).data).toMatchObject({
+      coverAssetId: pendingAsset.id,
+      version: 3,
+      isPast: true,
+    });
+    const parallel = await Promise.all([
+      patch(
+        second.id,
+        { ...full, title: "Первое сохранение" },
+        3,
+        "key-edit-parallel-01",
+      ),
+      patch(
+        second.id,
+        { ...full, title: "Второе сохранение" },
+        3,
+        "key-edit-parallel-02",
+      ),
+    ]);
+    expect(parallel.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect((await (await get(second.id)).json()).data.version).toBe(4);
+    await pg.exec(
+      "RESET ROLE; CREATE FUNCTION app.test_fail_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test failure'; END $$; CREATE TRIGGER test_change_failure BEFORE INSERT ON app.event_changes FOR EACH ROW EXECUTE FUNCTION app.test_fail_change(); SET ROLE fe_server;",
+    );
+    expect(
+      (
+        await patch(
+          second.id,
+          { ...full, venueName: "Несохранённое" },
+          4,
+          "key-edit-rollback-01",
+        )
+      ).status,
+    ).toBe(500);
+    expect((await (await get(second.id)).json()).data.version).toBe(4);
+    expect(
+      await query`SELECT id FROM app.api_idempotency WHERE key='key-edit-rollback-01'`,
+    ).toHaveLength(0);
+    await pg.exec(
+      "RESET ROLE; DROP TRIGGER test_change_failure ON app.event_changes; DROP FUNCTION app.test_fail_change(); SET ROLE fe_server;",
+    );
     await query`UPDATE app.events SET deleted_at=now() WHERE id=${first.id}`;
+    expect((await patch(first.id, minimal)).status).toBe(404);
     expect((await get(first.id)).status).toBe(404);
     await expect(
       EventPage({
@@ -312,9 +460,19 @@ it("creates real events atomically and enforces validation, idempotency and owne
       }),
     ).rejects.toThrow("TEST_NOT_FOUND");
     bridge.cookies.delete("__Host-fe_org");
+    expect((await patch(second.id, full)).status).toBe(401);
+    await expect(
+      EditPage({ params: Promise.resolve({ eventId: second.id }) }),
+    ).rejects.toThrow("TEST_REDIRECT:/login?returnTo=");
     expect((await get(second.id)).status).toBe(401);
     expect(returnPath("/events/new")).toBe("/events/new");
     expect(returnPath("//attacker.test/events/new")).toBe("/events");
+    expect(returnPath(`/events/${second.id}/edit`)).toBe(
+      `/events/${second.id}/edit`,
+    );
+    expect(returnPath(`/events/${second.id}/edit?redirect=evil`)).toBe(
+      "/events",
+    );
   } finally {
     bridge.cookies.clear();
     await pg.close();

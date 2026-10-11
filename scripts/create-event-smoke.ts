@@ -377,6 +377,137 @@ try {
     listed.find((item: { id: string }) => item.id === fullEvent.id).coverUrl,
     fullDetail.coverUrl,
   );
+  phase = "edit event, replace/remove cover, version conflict and ownership";
+  const editPath = `/events/${fullEvent.id}/edit`;
+  const editHtml = await (await request(owner, editPath)).text();
+  assert(
+    editHtml.includes("Редактировать событие") &&
+      editHtml.includes("Сохранить изменения"),
+  );
+  const foreignEditHtml = await (await request(other, editPath)).text();
+  assert(
+    foreignEditHtml.includes("Событие недоступно") &&
+      !foreignEditHtml.includes(full.title),
+  );
+  const patchPath = `/api/v1/events/${fullEvent.id}`;
+  const editedFields = {
+    ...full,
+    title: "Slice02 edited event",
+    venueName: "Новое место",
+    coverAssetId: null,
+  };
+  const editPayload = {
+    expectedVersion: fullDetail.version,
+    fields: editedFields,
+  };
+  assert.equal(
+    (await request(other, patchPath, "PATCH", editPayload, randomUUID()))
+      .status,
+    404,
+  );
+  assert.equal(
+    (
+      await request(
+        { ...owner, csrf: "invalid" },
+        patchPath,
+        "PATCH",
+        editPayload,
+        randomUUID(),
+      )
+    ).status,
+    403,
+  );
+  const editKey = randomUUID();
+  const editResponse = await request(
+    owner,
+    patchPath,
+    "PATCH",
+    editPayload,
+    editKey,
+  );
+  assert.equal(editResponse.status, 200);
+  const edited = (await editResponse.json()).data;
+  assert.equal(edited.version, fullDetail.version + 1);
+  assert.deepEqual(
+    (
+      await (
+        await request(owner, patchPath, "PATCH", editPayload, editKey)
+      ).json()
+    ).data,
+    edited,
+  );
+  assert.equal(
+    (await request(owner, patchPath, "PATCH", editPayload, randomUUID()))
+      .status,
+    409,
+  );
+  const removedCover = (await (await request(owner, patchPath)).json()).data;
+  assert.equal(removedCover.coverUrl, null);
+  assert.equal(removedCover.title, editedFields.title);
+  assert.equal(
+    (await request(owner, `/api/v1/events/${fullEvent.id}/cover`)).status,
+    404,
+  );
+  const replacementId = await upload(
+    owner,
+    await sharp({
+      create: { width: 16, height: 16, channels: 3, background: "#7952c7" },
+    })
+      .png()
+      .toBuffer(),
+    "image/png",
+  );
+  const replaceResponse = await request(
+    owner,
+    patchPath,
+    "PATCH",
+    {
+      expectedVersion: edited.version,
+      fields: { ...editedFields, coverAssetId: replacementId },
+    },
+    randomUUID(),
+  );
+  assert.equal(replaceResponse.status, 200);
+  const replacement = (await (await request(owner, patchPath)).json()).data;
+  assert.equal(replacement.coverAssetId, replacementId);
+  assert.equal((await request(owner, replacement.coverUrl)).status, 200);
+  assert.equal((await request(other, replacement.coverUrl)).status, 404);
+  const listAfterEdit = (await (await request(owner, "/api/v1/events")).json())
+    .data.events;
+  assert.equal(
+    listAfterEdit.find((item: { id: string }) => item.id === fullEvent.id)
+      .title,
+    editedFields.title,
+  );
+  const [wishlistCount] =
+    await sql`SELECT count(*)::int AS count FROM app.wishlists WHERE event_id=${fullEvent.id}`;
+  assert.equal(wishlistCount.count, 1);
+  const editParallel = await Promise.all([
+    request(
+      owner,
+      patchPath,
+      "PATCH",
+      {
+        expectedVersion: replacement.version,
+        fields: { ...editedFields, title: "Slice02 concurrent edit A" },
+      },
+      randomUUID(),
+    ),
+    request(
+      owner,
+      patchPath,
+      "PATCH",
+      {
+        expectedVersion: replacement.version,
+        fields: { ...editedFields, title: "Slice02 concurrent edit B" },
+      },
+      randomUUID(),
+    ),
+  ]);
+  assert.deepEqual(
+    editParallel.map((response) => response.status).sort(),
+    [200, 409],
+  );
   phase = "expired session and safe auth return";
   const hash = createHash("sha256").update(owner.cookie.split("=")[1]).digest();
   await sql`UPDATE app.organizer_sessions SET created_at=now()-make_interval(days=>31),expires_at=now()-make_interval(secs=>1) WHERE token_hash=${hash}`;
@@ -396,9 +527,20 @@ try {
     ),
     "/events/new",
   );
+  const expiredEdit = await fetchWithTimeout(root + editPath, {
+    headers: { Cookie: owner.cookie },
+    redirect: "manual",
+  });
+  assert.equal(expiredEdit.status, 307);
+  assert.equal(
+    new URL(expiredEdit.headers.get("location")!, root).searchParams.get(
+      "returnTo",
+    ),
+    editPath,
+  );
   await sql`UPDATE app.organizer_sessions SET expires_at=now()+make_interval(days=>1) WHERE token_hash=${hash}`;
   const start = await fetchWithTimeout(
-    root + "/api/auth/telegram/start?returnTo=/events/new",
+    root + "/api/auth/telegram/start?returnTo=" + encodeURIComponent(editPath),
     { redirect: "manual" },
   );
   assert.equal(start.status, 307);
@@ -407,7 +549,7 @@ try {
   )!;
   const [auth] =
     await sql`SELECT return_path FROM app.auth_transactions WHERE state_hash=${createHash("sha256").update(oidcState).digest()}`;
-  assert.equal(auth.return_path, "/events/new");
+  assert.equal(auth.return_path, editPath);
   phase = "soft deletion";
   await sql`UPDATE app.events SET deleted_at=now() WHERE id=${event.id} AND organizer_id=${owner.id}`;
   assert.equal(
@@ -421,7 +563,7 @@ try {
       !deletedHtml.includes(minimal.title),
   );
   console.info(
-    "PASS: staging form, minimal/full event + wishlist, CSRF, server validation, repeated/concurrent HTTP creation without duplicates, DB persistence, refresh, private pages, actual Storage upload/EXIF removal, cover ownership, expiry and returnTo. Browser interaction and iPhone checks remain manual.",
+    "PASS: staging creation and editing, minimal/full event + wishlist, cover replacement/removal, CSRF, validation, idempotency, concurrent version conflict, DB persistence, refresh, private pages, actual Storage upload/EXIF removal, owner isolation, expiry and edit auth returnTo. Browser interaction and iPhone checks remain manual.",
   );
 } catch {
   console.error(
@@ -450,6 +592,7 @@ try {
       await tx`DELETE FROM app.analytics_events WHERE user_id=${user.id}`;
       await tx`DELETE FROM app.api_idempotency WHERE principal_key=${"organizer:" + user.id}`;
       await tx`DELETE FROM app.wishlists WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${user.id})`;
+      await tx`DELETE FROM app.event_changes WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${user.id})`;
       await tx`DELETE FROM app.events WHERE organizer_id=${user.id}`;
       await tx`DELETE FROM app.media_assets WHERE owner_user_id=${user.id}`;
       await tx`DELETE FROM app.mini_app_logins WHERE session_hash IN(SELECT token_hash FROM app.organizer_sessions WHERE user_id=${user.id})`;

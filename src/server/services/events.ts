@@ -1,12 +1,90 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import type { z } from "zod";
-import { eventInput } from "@/lib/validation";
+import { eventInput, eventUpdateInput } from "@/lib/validation";
 import type { OrganizerPrincipal } from "@/types/principal";
 import { db, transaction } from "../db/client";
 import { idempotent } from "../db/idempotency";
 import { AppError, unavailable } from "../errors";
 import { eventTimes } from "./time";
+import { ownedEvent, expectedVersion } from "../db/authorization";
+export async function updateEvent(
+  principal: OrganizerPrincipal,
+  eventId: string,
+  input: z.infer<typeof eventUpdateInput>,
+  key: string,
+) {
+  return transaction(async (tx) => {
+    const owner = await ownedEvent(tx, principal, eventId);
+    return idempotent(
+      tx,
+      "organizer:" + principal.userId,
+      `PATCH /events/${eventId}`,
+      key,
+      input,
+      async () => {
+        expectedVersion(owner.version, input.expectedVersion);
+        const data = input.fields;
+        const times = eventTimes(
+          data.eventDate,
+          data.startTime,
+          data.endTime,
+          data.timezone,
+        );
+        if (data.coverAssetId) {
+          const [asset] =
+            await tx`SELECT id FROM app.media_assets WHERE id=${data.coverAssetId} AND owner_user_id=${principal.userId} AND state='ready' FOR SHARE`;
+          if (!asset)
+            throw new AppError(
+              422,
+              "INVALID_COVER",
+              "Выберите завершённую загрузку своей обложки.",
+              { coverAssetId: ["Обложка недоступна."] },
+            );
+        }
+        const [before] =
+          await tx`SELECT event_date::text,start_time::text,end_time::text,timezone,venue_name,address FROM app.events WHERE id=${eventId}`;
+        const significant = {
+          eventDate: [before.event_date, data.eventDate],
+          startTime: [
+            before.start_time?.slice(0, 5) ?? null,
+            data.startTime ?? null,
+          ],
+          endTime: [before.end_time?.slice(0, 5) ?? null, data.endTime ?? null],
+          timezone: [before.timezone, data.timezone],
+          venueName: [before.venue_name ?? "", data.venueName ?? ""],
+          address: [before.address ?? "", data.address ?? ""],
+        };
+        const changes = Object.fromEntries(
+          Object.entries(significant)
+            .filter(([, [a, b]]) => a !== b)
+            .map(([field, [before, after]]) => [field, { before, after }]),
+        );
+        const [event] =
+          await tx`UPDATE app.events SET title=${data.title},event_type=${data.eventType},event_date=${data.eventDate},start_time=${data.startTime ?? null},end_time=${data.endTime ?? null},timezone=${data.timezone},starts_at=${times.startsAt},ends_at=${times.endsAt},effective_at=${times.effectiveAt},venue_name=${data.venueName ?? null},address=${data.address ?? null},directions=${data.directions ?? null},description=${data.description ?? null},dress_code=${data.dressCode ?? null},latitude=${data.latitude ?? null},longitude=${data.longitude ?? null},cover_asset_id=${data.coverAssetId ?? null},version=version+1,updated_at=now() WHERE id=${eventId} AND organizer_id=${principal.userId} AND deleted_at IS NULL RETURNING id,version`;
+        let changeId: string | null = null;
+        const [recipients] =
+          await tx`SELECT count(*)::int AS count FROM app.notification_subscriptions WHERE event_id=${eventId} AND role='guest' AND enabled=true AND revoked_at IS NULL`;
+        if (Object.keys(changes).length) {
+          const [change] =
+            await tx`INSERT INTO app.event_changes(event_id,event_version,actor_user_id,changes,notify_decision,decided_at) VALUES(${eventId},${event.version},${principal.userId},${tx.json(changes)},${recipients.count ? "pending" : "skip"},${recipients.count ? null : new Date()}) RETURNING id`;
+          changeId = change.id;
+          // Do not send notifications on save. Cancel obsolete pending reminders.
+          await tx`UPDATE app.notifications SET status='cancelled' WHERE type='reminder_24h' AND status='pending' AND subscription_id IN (SELECT id FROM app.notification_subscriptions WHERE event_id=${eventId})`;
+        }
+        return {
+          status: 200,
+          body: {
+            id: event.id as string,
+            version: event.version as number,
+            changeId,
+            notificationRecipientsCount: recipients.count as number,
+          },
+        };
+      },
+    );
+  });
+}
 export async function createEvent(
   principal: OrganizerPrincipal,
   data: z.infer<typeof eventInput>,
@@ -59,7 +137,7 @@ export async function organizerEvent(
   eventId: string,
 ) {
   const [row] =
-    await db()`SELECT e.id,e.title,e.event_type,e.event_date::text,e.start_time::text,e.end_time::text,e.timezone,e.effective_at,e.venue_name,e.address,e.directions,e.description,e.dress_code,e.cover_asset_id,e.version,u.display_name,w.id AS wishlist_id,w.hide_reserver_identity,
+    await db()`SELECT e.id,e.title,e.event_type,e.event_date::text,e.start_time::text,e.end_time::text,e.timezone,e.effective_at,e.venue_name,e.address,e.directions,e.description,e.dress_code,e.latitude,e.longitude,e.cover_asset_id,e.version,u.display_name,w.id AS wishlist_id,w.hide_reserver_identity,
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='yes') AS yes,
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='no') AS no,
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='maybe') AS maybe,
@@ -84,6 +162,9 @@ export async function organizerEvent(
     description: row.description as string | null,
     dressCode: row.dress_code as string | null,
     version: row.version as number,
+    coverAssetId: row.cover_asset_id as string | null,
+    latitude: row.latitude == null ? null : Number(row.latitude),
+    longitude: row.longitude == null ? null : Number(row.longitude),
     coverUrl: row.cover_asset_id ? `/api/v1/events/${row.id}/cover` : null,
     wishlist: {
       id: row.wishlist_id as string | null,

@@ -112,6 +112,12 @@ export const giftInput = z
 export const expectedVersionInput = z.object({
   expectedVersion: z.number().int().positive(),
 });
+export const eventUpdateInput = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    fields: eventInput,
+  })
+  .strict();
 export const mediaInput = z
   .object({
     mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),

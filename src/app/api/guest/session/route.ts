@@ -1,15 +1,15 @@
-import { endpoint, reply } from "@/server/api";
+import { cookies } from "next/headers";
+import { z } from "zod";
+import { endpoint, reply, input } from "@/server/api";
 import { requireOrigin } from "@/server/auth/csrf";
 import { limit } from "@/server/auth/rate-limit";
 import {
-  guest,
   organizer,
-  createGuestSession,
   GUEST_COOKIE,
   GUEST_TTL,
   sessionCookie,
 } from "@/server/auth/sessions";
-import { transaction } from "@/server/db/client";
+import { bootstrapGuest } from "@/server/services/guest-session";
 import { AppError } from "@/server/errors";
 export const POST = endpoint(async (request, id) => {
   requireOrigin(request);
@@ -18,25 +18,26 @@ export const POST = endpoint(async (request, id) => {
     "guest_session",
     Number(process.env.GUEST_SESSION_RATE_LIMIT ?? 20),
   );
-  try {
-    await guest();
-    return reply({ created: false }, id);
-  } catch (e) {
-    if (!(e instanceof AppError && e.status === 401)) throw e;
-  }
+  const options = request.body
+    ? await input(
+        request,
+        z.object({ restart: z.boolean().optional() }).strict(),
+      )
+    : {};
   let userId: string | null = null;
   try {
     userId = (await organizer()).userId;
-  } catch (e) {
-    if (!(e instanceof AppError && e.status === 401)) throw e;
+  } catch (error) {
+    if (!(error instanceof AppError && error.status === 401)) throw error;
   }
-  const raw = await transaction(async (tx) => {
-    const [identity] = userId
-      ? await tx`INSERT INTO app.guest_identities(linked_user_id) VALUES(${userId}) ON CONFLICT(linked_user_id) DO UPDATE SET linked_user_id=excluded.linked_user_id RETURNING id`
-      : await tx`INSERT INTO app.guest_identities DEFAULT VALUES RETURNING id`;
-    return createGuestSession(tx, identity.id);
-  });
-  const response = reply({ created: true }, id, 201);
-  sessionCookie(response, GUEST_COOKIE, raw, GUEST_TTL);
+  const raw = (await cookies()).get(GUEST_COOKIE)?.value;
+  const result = await bootstrapGuest(raw, userId, options.restart === true);
+  const response = reply(
+    { created: result.created },
+    id,
+    result.created ? 201 : 200,
+  );
+  if (result.created)
+    sessionCookie(response, GUEST_COOKIE, result.raw, GUEST_TTL);
   return response;
 });

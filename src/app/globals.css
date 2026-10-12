@@ -669,3 +669,126 @@ a:focus-visible {
     height: 260px;
   }
 }
+
+.public-shell {
+  max-width: 1040px;
+}
+.public-layout {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+.public-side {
+  min-width: 0;
+}
+.rsvp-buttons {
+  display: grid;
+  gap: 10px;
+}
+.rsvp-buttons .primary {
+  margin: 0;
+}
+.status-answer {
+  background: #f5efff;
+  color: #63409f;
+  padding: 14px;
+  border-radius: 12px;
+}
+.rsvp-dialog fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.rsvp-counts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.rsvp-dialog input,
+.rsvp-dialog textarea,
+.rsvp-dialog select {
+  width: 100%;
+}
+.guests-shell {
+  width: 100%;
+  max-width: 1040px;
+}
+.guest-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 24px;
+}
+.guest-filters button {
+  padding: 12px 4px;
+  overflow-wrap: anywhere;
+}
+.guest-filters span {
+  display: block;
+  margin-top: 4px;
+}
+.guest-filters button[aria-pressed="true"] {
+  background: #7952c7;
+  color: white;
+}
+.guest-cards {
+  display: grid;
+  gap: 16px;
+}
+.guest-card h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.guest-status {
+  color: #63409f;
+}
+.guest-comment {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.latest-guests {
+  display: grid;
+  gap: 12px;
+}
+.latest-guests .guest-card {
+  padding: 12px;
+}
+@media (min-width: 768px) {
+  .guest-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .guest-summary,
+  .guest-filters {
+    max-width: 640px;
+  }
+}
+@media (min-width: 1024px) {
+  .public-layout {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.85fr);
+  }
+  .public-side {
+    position: sticky;
+    top: 24px;
+  }
+}
+
+.rsvp-stepper {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  gap: 4px;
+  align-items: center;
+}
+.event-shell dialog .rsvp-stepper button {
+  margin: 0;
+  padding: 6px;
+}
+.rsvp-stepper input {
+  padding: 12px 4px;
+  text-align: center;
+}
+@media (max-width: 599px) {
+  .rsvp-counts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

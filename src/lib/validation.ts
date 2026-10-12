@@ -63,11 +63,22 @@ export const eventInput = z
   });
 export const rsvpInput = z
   .object({
-    guestName: z.string().trim().min(2).max(60),
+    guestName: z
+      .string()
+      .trim()
+      .refine(
+        (v) => [...v].length >= 2 && [...v].length <= 60,
+        "Имя должно содержать от 2 до 60 символов.",
+      ),
     status: z.enum(["yes", "no", "maybe"]),
     adultsCount: z.number().int(),
     childrenCount: z.number().int(),
-    comment: optionalText(300),
+    comment: z
+      .string()
+      .trim()
+      .refine((v) => [...v].length <= 300, "Комментарий — до 300 символов.")
+      .nullable()
+      .optional(),
     expectedVersion: z.number().int().positive().nullable(),
   })
   .strict()

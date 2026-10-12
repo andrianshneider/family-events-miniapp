@@ -49,8 +49,14 @@ export async function guest(): Promise<GuestPrincipal> {
   const raw = validToken((await cookies()).get(GUEST_COOKIE)?.value);
   if (!raw) throw unauthenticated();
   const [row] =
-    await db()`SELECT s.id,g.id AS identity_id FROM app.guest_sessions s JOIN app.guest_identities g ON g.id=s.guest_identity_id WHERE s.token_hash=${tokenHash(raw)} AND s.revoked_at IS NULL AND s.expires_at>now() AND g.merged_into_id IS NULL`;
+    await db()`SELECT s.id,g.id AS identity_id,g.linked_user_id FROM app.guest_sessions s JOIN app.guest_identities g ON g.id=s.guest_identity_id WHERE s.token_hash=${tokenHash(raw)} AND s.revoked_at IS NULL AND s.expires_at>now() AND g.merged_into_id IS NULL`;
   if (!row) throw unauthenticated();
+  const orgRaw = validToken((await cookies()).get(ORG_COOKIE)?.value);
+  if (row.linked_user_id && orgRaw) {
+    const [org] =
+      await db()`SELECT user_id FROM app.organizer_sessions WHERE token_hash=${tokenHash(orgRaw)} AND revoked_at IS NULL AND expires_at>now()`;
+    if (org && org.user_id !== row.linked_user_id) throw unauthenticated();
+  }
   return { kind: "guest", guestIdentityId: row.identity_id, sessionId: row.id };
 }
 

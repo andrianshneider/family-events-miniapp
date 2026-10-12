@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
+import { RsvpCard } from "./rsvp-card";
 import { EventInformation } from "./event-information";
 import { watchEventChanges } from "@/lib/event-updates";
 export function PublicEventScreen({
@@ -13,6 +14,7 @@ export function PublicEventScreen({
   const [unavailable, setUnavailable] = useState(false);
   const [pending, setPending] = useState(false);
   const [offline, setOffline] = useState(false);
+  const closeEvent = useCallback(() => setUnavailable(true), []);
   const flight = useRef(false),
     last = useRef(0);
   const refresh = useCallback(async () => {
@@ -108,8 +110,11 @@ export function PublicEventScreen({
             </div>
           )}
           {pending && <p role="status">Обновляем приглашение…</p>}
-          <div className="public-information" aria-busy={pending}>
+          <div className="public-layout public-information" aria-busy={pending}>
             <EventInformation event={event} />
+            <aside className="public-side">
+              <RsvpCard event={event} onUnavailable={closeEvent} />
+            </aside>
           </div>
           <footer className="public-footer">
             Личная встреча по приглашению

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import type { organizerEvent } from "@/server/services/events";
 import { eventDateLabel, eventTypes } from "./event-presentation";
+import { GuestCard } from "./guest-card";
 import { EventActions } from "./event-actions";
 import { OrganizerHeader } from "./organizer-header";
 type Event = Awaited<ReturnType<typeof organizerEvent>>;
@@ -73,7 +74,7 @@ export function EventScreen({
     document.addEventListener("visibilitychange", restore);
     window.addEventListener("pageshow", show);
     window.addEventListener("online", restore);
-    const interval = window.setInterval(restore, 15000);
+    const interval = window.setInterval(restore, 5000);
     const stopWatching = watchEventChanges(restore);
     return () => {
       document.removeEventListener("visibilitychange", restore);
@@ -198,6 +199,17 @@ export function EventScreen({
                 ? "Ответы сохранены в событии."
                 : "Пока никто не ответил на приглашение."}
             </p>
+            <div className="latest-guests">
+              {event.latestResponses.map((guest) => (
+                <GuestCard guest={guest} key={guest.id} />
+              ))}
+            </div>
+            <Link
+              className="secondary route-link"
+              href={`/events/${event.id}/guests`}
+            >
+              Посмотреть всех
+            </Link>
           </section>
           <section className="panel">
             <h2>Вишлист</h2>

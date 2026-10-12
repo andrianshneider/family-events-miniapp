@@ -7,6 +7,7 @@ import { db, transaction } from "../db/client";
 import { idempotent } from "../db/idempotency";
 import { AppError, unavailable } from "../errors";
 import { eventTimes } from "./time";
+import { rsvpDto } from "./rsvps";
 import { ownedEvent, expectedVersion } from "../db/authorization";
 export async function updateEvent(
   principal: OrganizerPrincipal,
@@ -185,6 +186,7 @@ export async function organizerEvent(
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='maybe') AS maybe,
     (SELECT coalesce(sum(adults_count),0)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='yes') AS adults,
     (SELECT coalesce(sum(children_count),0)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='yes') AS children,
+    (SELECT coalesce(jsonb_agg(preview), '[]'::jsonb) FROM (SELECT r.id,r.guest_name,r.status,r.adults_count,r.children_count,r.comment,r.version,r.updated_at FROM app.rsvps r WHERE r.event_id=e.id ORDER BY r.updated_at DESC,r.id DESC LIMIT 3) preview) AS latest_responses,
     (SELECT count(*)::int FROM app.gifts g WHERE g.wishlist_id=w.id AND g.deleted_at IS NULL) AS gifts
     FROM app.events e JOIN app.users u ON u.id=e.organizer_id LEFT JOIN app.wishlists w ON w.event_id=e.id WHERE e.id=${eventId} AND e.organizer_id=${principal.userId} AND e.deleted_at IS NULL`;
   if (!row) throw unavailable();
@@ -213,6 +215,9 @@ export async function organizerEvent(
       surprise: row.hide_reserver_identity as boolean,
       gifts: row.gifts as number,
     },
+    latestResponses: (
+      (row.latest_responses ?? []) as Record<string, unknown>[]
+    ).map(rsvpDto),
     responses: {
       yes: row.yes as number,
       no: row.no as number,

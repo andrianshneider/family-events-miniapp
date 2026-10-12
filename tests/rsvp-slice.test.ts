@@ -167,6 +167,17 @@ it("preserves guest authority and one RSVP through real session/context/write/li
     const guestId = String(g1.guest_identity_id);
     expect(await query`SELECT id FROM app.guest_identities`).toHaveLength(1);
     expect((await bootstrap()).status).toBe(200);
+    expect(
+      (
+        await session(
+          new Request("https://example.test/api/guest/session", {
+            method: "POST",
+            headers: { Origin: "https://example.test" },
+            body: "",
+          }),
+        )
+      ).status,
+    ).toBe(200);
     expect(bridge.cookies.get("__Host-fe_guest")).toBe(raw);
     expect(await query`SELECT id FROM app.guest_sessions`).toHaveLength(1);
     expect((await bootstrap({ guestIdentityId: "forged" })).status).toBe(422);

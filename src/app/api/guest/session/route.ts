@@ -18,12 +18,12 @@ export const POST = endpoint(async (request, id) => {
     "guest_session",
     Number(process.env.GUEST_SESSION_RATE_LIMIT ?? 20),
   );
-  const options = request.body
-    ? await input(
-        request,
-        z.object({ restart: z.boolean().optional() }).strict(),
-      )
-    : {};
+  const options = await input(
+    request,
+    z.object({ restart: z.boolean().optional() }).strict().default({}),
+    16384,
+    true,
+  );
   let userId: string | null = null;
   try {
     userId = (await organizer()).userId;

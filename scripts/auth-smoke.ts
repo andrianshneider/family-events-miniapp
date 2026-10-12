@@ -35,6 +35,7 @@ let userId: string | undefined,
   guestToken: string | undefined,
   otherId: string | undefined;
 const startedAt = new Date();
+let phase = "signed initData validation and login";
 function payload(age = 0) {
   const p = new URLSearchParams({
     auth_date: String(Math.floor(Date.now() / 1000) - age),
@@ -110,6 +111,7 @@ try {
   });
   assert.equal(profile.status, 200);
   assert.equal((await profile.json()).data.id, userId);
+  phase = "owner events, pagination and refresh";
   const publicEvents = await fetch(root + "/api/v1/events");
   assert.equal(publicEvents.status, 401);
   const list = () =>
@@ -172,6 +174,7 @@ try {
   const tokenHash = createHash("sha256")
     .update(orgCookie.split("=")[1])
     .digest();
+  phase = "session expiry, CSRF, logout and relogin";
   await sql`UPDATE app.organizer_sessions SET created_at=now()-interval '31 days',expires_at=now()-interval '1 second' WHERE token_hash=${tokenHash}`;
   assert.equal(
     (await fetch(root + "/api/v1/me", { headers: { Cookie: orgCookie } }))
@@ -237,6 +240,7 @@ try {
     body: JSON.stringify({ initData }),
   });
   assert.equal(reused.status, 401);
+  phase = "bodyless Guest Session bootstrap";
   const guest = await fetch(root + "/api/guest/session", {
     method: "POST",
     headers: { Origin: new URL(root).origin },
@@ -251,8 +255,16 @@ try {
   console.info(
     "PASS: staging signed initData, stale/forged/replay rejection, same-session retry, secure cookies, profile, empty state, real DB events, pagination, owner isolation, refresh, expiry redirect, CSRF, logout revocation, one-use browser-bound relogin. Synthetic identities only; real Telegram and iPhone sign-in require device verification.",
   );
-} catch {
-  console.error("Auth smoke failed; tokens and payloads not printed.");
+} catch (error) {
+  const numeric =
+    error instanceof assert.AssertionError &&
+    typeof error.actual === "number" &&
+    typeof error.expected === "number"
+      ? ` Expected ${error.expected}, received ${error.actual}.`
+      : "";
+  console.error(
+    `Auth smoke failed at ${phase}.${numeric} Tokens and payloads not printed.`,
+  );
   process.exitCode = 1;
 } finally {
   await sql.begin(async (tx) => {

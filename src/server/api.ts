@@ -82,10 +82,15 @@ export async function input<T>(
   request: Request,
   schema: z.ZodType<T>,
   maxBytes = 16384,
+  allowEmpty = false,
 ): Promise<T> {
-  if (!request.headers.get("content-type")?.startsWith("application/json"))
+  const json = request.headers
+    .get("content-type")
+    ?.startsWith("application/json");
+  if (!json && !allowEmpty)
     throw new AppError(400, "INVALID_CONTENT_TYPE", "Требуется JSON.");
   const reader = request.body?.getReader();
+  if (!reader && allowEmpty) return schema.parse(undefined);
   if (!reader) throw new AppError(400, "INVALID_JSON", "Пустой запрос.");
   let bytes = 0;
   const chunks: Uint8Array[] = [];
@@ -99,6 +104,8 @@ export async function input<T>(
     }
     chunks.push(value);
   }
+  if (bytes === 0 && allowEmpty) return schema.parse(undefined);
+  if (!json) throw new AppError(400, "INVALID_CONTENT_TYPE", "Требуется JSON.");
   let raw: unknown;
   try {
     raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));

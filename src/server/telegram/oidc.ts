@@ -19,7 +19,7 @@ export function returnPath(value: string | null) {
     return value;
   if (
     value &&
-    /^\/events\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(edit|share)$/i.test(
+    /^\/events\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/(edit|share|wishlist)$/i.test(
       value,
     )
   )

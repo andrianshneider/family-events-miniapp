@@ -223,7 +223,8 @@ export function EventScreen({
                 ? "Режим сюрприза включён."
                 : "Режим сюрприза выключен."}
             </p>
-            <p className="hint">Добавление подарков скоро появится.</p>
+            <p>Выбрано: {event.wishlist.reserved}</p>
+            <Link className="secondary route-link" href={`/events/${event.id}/wishlist`}>Управлять wishlist</Link>
           </section>
           <section className="panel">
             <h2>Пригласите близких</h2>

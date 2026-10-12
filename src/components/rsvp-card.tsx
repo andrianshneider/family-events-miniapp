@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
 import { rsvpLabels, type RsvpStatus, type GuestContext } from "@/lib/rsvp";
@@ -493,6 +494,7 @@ export function RsvpCard({
               <p>Увидимся {eventDateLabel(event.eventDate)}.</p>
             )}
             <p>Ваш ответ: {context?.rsvp && rsvpLabels[context.rsvp.status]}</p>
+            <Link className="secondary route-link" href={`/e/${event.publicId}/wishlist`}>Посмотреть wishlist</Link>
             <button className="primary" autoFocus onClick={close}>
               К событию
             </button>

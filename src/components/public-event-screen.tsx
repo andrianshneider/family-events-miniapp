@@ -1,13 +1,17 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
+import { WishlistScreen } from "./wishlist-screen";
+import type { Wishlist } from "@/lib/wishlist";
 import { RsvpCard } from "./rsvp-card";
 import { EventInformation } from "./event-information";
 import { watchEventChanges } from "@/lib/event-updates";
 export function PublicEventScreen({
   initialEvent,
+  initialWishlist = null,
 }: {
   initialEvent: PublicEvent;
+  initialWishlist?: Wishlist | null;
 }) {
   const [event, setEvent] = useState(initialEvent);
   const [error, setError] = useState("");
@@ -114,6 +118,7 @@ export function PublicEventScreen({
             <EventInformation event={event} />
             <aside className="public-side">
               <RsvpCard event={event} onUnavailable={closeEvent} />
+              <WishlistScreen eventKey={event.publicId} preview initial={initialWishlist} />
             </aside>
           </div>
           <footer className="public-footer">

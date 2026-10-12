@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { publicPageEvent } from "@/server/services/public-page";
 import { canonicalEventUrl } from "@/server/services/public-events";
+import { readWishlist } from "@/server/services/wishlists";
 import { AppError } from "@/server/errors";
 import { eventWhen } from "@/lib/invitation";
 import { PublicEventScreen } from "@/components/public-event-screen";
@@ -66,10 +67,13 @@ export default async function PublicPage({
     if (error instanceof AppError && error.status === 404) notFound();
     throw error;
   }
+  let wishlist = null;
+  try { wishlist = await readWishlist(event.publicId, {limit:3}); } catch(error) { if(error instanceof AppError && error.status===404) notFound(); }
   return (
     <PublicEventScreen
       key={`${event.publicId}:${event.version}`}
       initialEvent={event}
+      initialWishlist={wishlist}
     />
   );
 }

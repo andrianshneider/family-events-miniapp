@@ -99,16 +99,27 @@ export const rsvpInput = z
   });
 export const giftInput = z
   .object({
-    title: z.string().trim().min(2).max(120),
+    title: z
+      .string()
+      .trim()
+      .refine(
+        (v) => [...v].length >= 2 && [...v].length <= 120,
+        "Название — от 2 до 120 символов.",
+      ),
     externalUrl: httpUrl.nullable().optional(),
     amount: z
       .string()
       .regex(/^\d{1,10}(\.\d{1,2})?$/)
-      .refine((v) => Number(v) > 0)
+      .refine((v) => /[1-9]/.test(v))
       .nullable()
       .optional(),
     currency: z.enum(["RUB", "EUR", "USD"]).nullable().optional(),
-    comment: optionalText(300),
+    comment: z
+      .string()
+      .trim()
+      .refine((v) => [...v].length <= 300, "Комментарий — до 300 символов.")
+      .nullable()
+      .optional(),
     imageAssetId: z.uuid().nullable().optional(),
   })
   .strict()
@@ -124,6 +135,21 @@ export const expectedVersionInput = z.object({
   expectedVersion: z.number().int().positive(),
 });
 export const eventDeleteInput = expectedVersionInput.strict();
+export const giftUpdateInput = z
+  .object({ expectedVersion: z.number().int().positive(), fields: giftInput })
+  .strict();
+export const giftDeleteInput = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    confirmReserved: z.boolean().default(false),
+  })
+  .strict();
+export const wishlistInput = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    hideReserverIdentity: z.boolean(),
+  })
+  .strict();
 export const eventUpdateInput = z
   .object({
     expectedVersion: z.number().int().positive(),

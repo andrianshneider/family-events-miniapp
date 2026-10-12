@@ -792,3 +792,37 @@ a:focus-visible {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Wishlist uses the existing application type, colors and accessible controls. */
+.wishlist-shell { max-width:1100px; }
+.gift-grid { display:grid; gap:16px; grid-template-columns:minmax(0,1fr); }
+.gift-card { border:1px solid var(--line,#e6dff0); border-radius:20px; overflow:hidden; background:white; min-width:0; }
+.gift-picture { min-height:150px; background:#f5efff; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.gift-picture > span { font-size:48px; padding:28px; }
+.gift-picture img { width:100%; height:180px; object-fit:contain; }
+.gift-body { padding:18px; }
+.gift-body h2,.gift-detail h1 { overflow-wrap:anywhere; }
+.gift-body h2 a { color:inherit; text-decoration:none; }
+.gift-body p { margin:12px 0; }
+.gift-comment { white-space:pre-wrap; overflow-wrap:anywhere; }
+.gift-price { font-weight:650; }
+.gift-status { color:#70509a; }
+.gift-actions,.gift-dialog-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:18px; }
+.gift-actions > button { flex:1; }
+.wishlist-settings { max-width:640px; }
+.surprise-switch { display:flex; align-items:center; gap:12px; min-height:48px; cursor:pointer; }
+.surprise-switch input { width:24px; height:24px; accent-color:#7e50c5; }
+.wishlist-toolbar { margin:24px 0; }
+.wishlist-toolbar .primary { width:100%; }
+.gift-fields { border:0; margin:0; padding:0; display:grid; gap:16px; }
+.gift-money { display:grid; grid-template-columns:minmax(0,1fr) 100px; gap:16px; }
+.gift-form-photo img { max-width:100%; max-height:180px; object-fit:contain; }
+.gift-form-photo { display:grid; gap:12px; }
+.gift-detail-shell { max-width:1040px; }
+.gift-detail { display:grid; gap:24px; }
+.gift-detail .gift-picture img { height:auto; max-height:400px; }
+.wishlist-preview .gift-grid { grid-template-columns:minmax(0,1fr); }
+.wishlist-preview .gift-picture img { height:140px; }
+.wishlist-preview > .route-link { margin-top:16px; }
+@media(min-width:768px) { .gift-grid {grid-template-columns:repeat(2,minmax(0,1fr));} .wishlist-toolbar {display:flex;justify-content:space-between;align-items:center;gap:16px;} .wishlist-toolbar .primary {width:auto;} }
+@media(min-width:1024px) { .gift-grid {grid-template-columns:repeat(3,minmax(0,1fr));} .gift-detail {grid-template-columns:1fr 1fr;} }

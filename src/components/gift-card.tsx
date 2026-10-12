@@ -1,4 +1,6 @@
 "use client";
+import { wishlistText } from "@/lib/wishlist-copy";
+
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -15,7 +17,7 @@ export function GiftImage({ gift }: { gift: Gift }) {
           src={gift.imageUrl}
           width={640}
           height={384}
-          alt={`Фото подарка «${gift.title}»`}
+          alt={wishlistText("Фото подарка «{0}»", [gift.title])}
           onError={() => setFailed(gift.imageUrl)}
         />
       ) : (
@@ -29,7 +31,7 @@ export function GiftImage({ gift }: { gift: Gift }) {
                 setRetry(retry + 1);
               }}
             >
-              Повторить загрузку фото
+              {wishlistText("Повторить загрузку фото")}
             </button>
           )}
         </>
@@ -56,7 +58,7 @@ export function GiftCard({
           {publicId ? (
             <Link
               href={`/e/${publicId}/wishlist/${gift.id}`}
-              aria-label={`Детали подарка: ${gift.title}`}
+              aria-label={wishlistText("Детали подарка: {0}", [gift.title])}
             >
               {gift.title}
             </Link>
@@ -66,10 +68,15 @@ export function GiftCard({
         </h2>
         {giftPrice(gift) && <p className="gift-price">{giftPrice(gift)}</p>}
         <p className="gift-status">
-          {gift.reserved ? "✓ Уже выбран" : "Свободен"}
+          {gift.reserved
+            ? wishlistText("✓ Уже выбран")
+            : wishlistText("Свободен")}
         </p>
         {showName && gift.reserverDisplayName && (
-          <p>Выбрал(а): {gift.reserverDisplayName}</p>
+          <p>
+            {wishlistText("Выбрал(а): ")}
+            {gift.reserverDisplayName}
+          </p>
         )}
         {!publicId && gift.comment && (
           <p className="gift-comment">{gift.comment}</p>
@@ -81,7 +88,8 @@ export function GiftCard({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Посмотреть подарок <span className="hint">(новая вкладка)</span>
+            {wishlistText("Посмотреть подарок ")}
+            <span className="hint">{wishlistText("(новая вкладка)")}</span>
           </a>
         )}
         {actions}

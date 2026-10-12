@@ -158,7 +158,9 @@ async function upload(a: Actor, bytes: Buffer, complete = true) {
   return p.assetId as string;
 }
 try {
-  assert.equal((await sql`SELECT current_user AS role`)[0].role, "fe_server");
+  const [role] =
+    await sql`SELECT rolsuper,rolbypassrls,pg_has_role(current_user,'fe_server','member') AS server FROM pg_roles WHERE rolname=current_user`;
+  assert(role.server && !role.rolsuper && !role.rolbypassrls);
   const owner = await login(tids[0]),
     foreign = await login(tids[1]),
     e = await makeEvent(owner, "Slice06 wishlist fixture"),
@@ -577,6 +579,31 @@ try {
     "Slice06 private reserver",
   );
   const visible = await get(base + "/wishlist", owner.cookie);
+  const publicBeforeName = await get(pub + "/wishlist");
+  await sql`UPDATE app.guest_identities SET display_name='Slice06 renamed reserver' WHERE id=${guest.id}`;
+  assert.notEqual(
+    (await get(base + "/wishlist", owner.cookie)).revision,
+    visible.revision,
+  );
+  assert.equal(
+    (await get(pub + "/wishlist")).revision,
+    publicBeforeName.revision,
+  );
+  await sql`UPDATE app.guest_identities SET display_name='Slice06 private reserver' WHERE id=${guest.id}`;
+  const [deltaGift] =
+    await sql`INSERT INTO app.gifts(wishlist_id,title) VALUES((SELECT id FROM app.wishlists WHERE event_id=${other.id}),'Reservation revision fixture') RETURNING id`;
+  await sql`SELECT app.reserve_gift(${other.publicId},${deltaGift.id},${guest.id})`;
+  const deltaBefore = await get(
+    `/api/v1/public/events/${other.publicId}/wishlist`,
+  );
+  await sql`SELECT app.cancel_reservation(${other.publicId},${deltaGift.id},${guest.id})`;
+  await sql`SELECT app.reserve_gift(${other.publicId},${deltaGift.id},${guest.id})`;
+  const deltaAfter = await get(
+    `/api/v1/public/events/${other.publicId}/wishlist`,
+  );
+  assert.equal(deltaAfter.reservedTotal, deltaBefore.reservedTotal);
+  assert.notEqual(deltaAfter.revision, deltaBefore.revision);
+
   assert.equal(
     (
       await request(
@@ -786,6 +813,73 @@ try {
     ).length,
     0,
   );
+  const editingRace = await request(
+    raceBase + "/gifts",
+    owner.cookie,
+    "POST",
+    { title: "Edit/delete race" },
+    owner.csrf,
+  );
+  assert.equal(editingRace.status, 201);
+  const editingGift = (await editingRace.json()).data;
+  const editingPath = raceBase + `/gifts/${editingGift.id}`;
+  const editDelete = await Promise.all([
+    request(
+      editingPath,
+      owner.cookie,
+      "PATCH",
+      { expectedVersion: 1, fields: { title: "Changed in race" } },
+      owner.csrf,
+    ),
+    request(
+      editingPath,
+      owner.cookie,
+      "DELETE",
+      { expectedVersion: 1 },
+      owner.csrf,
+    ),
+  ]);
+  assert([200, 404].includes(editDelete[0].status));
+  assert([200, 409].includes(editDelete[1].status));
+  if (editDelete[1].status === 409) {
+    assert.equal(editDelete[0].status, 200);
+    const current = await get(editingPath, owner.cookie);
+    assert.equal(
+      (
+        await request(
+          editingPath,
+          owner.cookie,
+          "DELETE",
+          { expectedVersion: current.version },
+          owner.csrf,
+        )
+      ).status,
+      200,
+    );
+  }
+  assert.equal((await request(editingPath, owner.cookie)).status, 404);
+  const createDelete = await Promise.all([
+    request(
+      raceBase + "/gifts",
+      owner.cookie,
+      "POST",
+      { title: "Create versus Event delete" },
+      owner.csrf,
+    ),
+    request(
+      raceBase,
+      owner.cookie,
+      "DELETE",
+      { expectedVersion: race.version },
+      owner.csrf,
+    ),
+  ]);
+  assert([201, 404].includes(createDelete[0].status));
+  assert.equal(createDelete[1].status, 200);
+  assert.equal(
+    (await request(raceBase + "/wishlist", owner.cookie)).status,
+    404,
+  );
   const [version] = await sql`SELECT version FROM app.events WHERE id=${e.id}`;
   assert.equal(
     (
@@ -820,7 +914,7 @@ try {
     404,
   );
   console.info(
-    "PASS: staging real Gift CRUD/versions/idempotency, same-event ownership, empty SSR/public read without session creation, Surprise ON/OFF projections, real private Storage and bounded image proxies, invalid uploads and attachment guards, edit reservation preservation, confirmed soft delete/cancellation, shared images, actual parallel edit/reserve-delete, complete microsecond pagination and deleted routes. Physical device interactions remain manual.",
+    "PASS: staging real Gift CRUD/versions/idempotency, same-event ownership, empty SSR/public read without session creation, Surprise ON/OFF projections, real private Storage and bounded image proxies, invalid uploads and attachment guards, edit reservation preservation, confirmed soft delete/cancellation, shared images, actual parallel edit/edit, reserve/delete, Gift edit/delete and Gift create/Event delete, complete microsecond pagination and deleted routes. Physical device interactions remain manual.",
   );
 } catch (error) {
   const numeric =
@@ -866,6 +960,6 @@ try {
     });
   }
   for (const id of guestIds)
-    await sql`DELETE FROM app.guest_identities WHERE id=${id} AND created_at>=${started} AND display_name='Slice06 private reserver'`;
+    await sql`DELETE FROM app.guest_identities WHERE id=${id} AND created_at>=${started}`;
   await sql.end();
 }

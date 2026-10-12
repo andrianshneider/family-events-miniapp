@@ -1,4 +1,6 @@
 "use client";
+import { wishlistText } from "@/lib/wishlist-copy";
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -63,7 +65,9 @@ export function WishlistScreen({
     if (locking.current || busy) return;
     if (
       (attempt || formUncertain) &&
-      !window.confirm("Результат неизвестен. Закрыть форму и проверить список?")
+      !window.confirm(
+        wishlistText("Результат неизвестен. Закрыть форму и проверить список?"),
+      )
     )
       return;
     dialog.current?.close();
@@ -97,7 +101,9 @@ export function WishlistScreen({
       await organizerMutation(op.path, op.method, op.body, op.key);
       setAttempt(null);
       setNotice(
-        op.kind === "delete" ? "Подарок удалён." : "Настройка сохранена.",
+        op.kind === "delete"
+          ? wishlistText("Подарок удалён.")
+          : wishlistText("Настройка сохранена."),
       );
       announceEventChange();
       if (op.kind === "delete") {
@@ -129,10 +135,12 @@ export function WishlistScreen({
       }
       setOpError(
         unknown
-          ? "Результат пока неизвестен. Проверьте сохранение повтором той же операции."
+          ? wishlistText(
+              "Результат пока неизвестен. Проверьте сохранение повтором той же операции.",
+            )
           : caught instanceof Error
             ? caught.message
-            : "Не удалось сохранить изменения.",
+            : wishlistText("Не удалось сохранить изменения."),
       );
     } finally {
       locking.current = false;
@@ -145,7 +153,9 @@ export function WishlistScreen({
     if (
       !target &&
       !window.confirm(
-        "Выключить режим сюрприза? Имена выбравших подарки станут видны вам; другие гости их не увидят.",
+        wishlistText(
+          "Выключить режим сюрприза? Имена выбравших подарки станут видны вам; другие гости их не увидят.",
+        ),
       )
     )
       return;
@@ -161,23 +171,27 @@ export function WishlistScreen({
     showName = !data?.hideReserverIdentity && !busy && !attempt;
   const content = unavailable ? (
     <>
-      <h1>Это мероприятие недоступно</h1>
-      <p>Событие удалено или у вас нет доступа.</p>
+      <h1>{wishlistText("Это мероприятие недоступно")}</h1>
+      <p>{wishlistText("Событие удалено или у вас нет доступа.")}</p>
     </>
   ) : (
     <>
       {!preview && (
         <>
           <Link className="text-button back" href={back}>
-            ← К событию
+            {wishlistText("← К событию")}
           </Link>
-          <h1>{owner ? "Вишлист" : "Что подарить"}</h1>
+          <h1>
+            {owner ? wishlistText("Вишлист") : wishlistText("Что подарить")}
+          </h1>
           {data && <p>{data.event.title}</p>}
         </>
       )}
       {offline && (
         <p className="notice" role="status">
-          Нет соединения. Ранее загруженные данные могут быть неактуальны.
+          {wishlistText(
+            "Нет соединения. Ранее загруженные данные могут быть неактуальны.",
+          )}
         </p>
       )}
       {error && (
@@ -188,7 +202,7 @@ export function WishlistScreen({
             disabled={pending || offline}
             onClick={() => load()}
           >
-            Попробовать снова
+            {wishlistText("Попробовать снова")}
           </button>
         </div>
       )}
@@ -201,7 +215,7 @@ export function WishlistScreen({
               disabled={busy || offline}
               onClick={() => run(attempt)}
             >
-              Проверить сохранение
+              {wishlistText("Проверить сохранение")}
             </button>
           )}
         </div>
@@ -213,7 +227,7 @@ export function WishlistScreen({
       )}
       {owner && data && (
         <section className="panel wishlist-settings">
-          <h2>Режим сюрприза</h2>
+          <h2>{wishlistText("Режим сюрприза")}</h2>
           <label className="surprise-switch">
             <input
               type="checkbox"
@@ -223,42 +237,47 @@ export function WishlistScreen({
               onChange={toggle}
               aria-describedby="surprise-help"
             />
-            Скрывать, кто выбрал подарок
+            {wishlistText("Скрывать, кто выбрал подарок")}
           </label>
           <p className="hint" id="surprise-help">
-            Вы увидите, что подарок выбран, но не узнаете кем.
+            {wishlistText("Вы увидите, что подарок выбран, но не узнаете кем.")}
           </p>
           <p>
             {busy
-              ? "Сохраняем…"
+              ? wishlistText("Сохраняем…")
               : data.hideReserverIdentity
-                ? "Режим сюрприза включён."
-                : "Имена выбравших подарки доступны вам."}
+                ? wishlistText("Режим сюрприза включён.")
+                : wishlistText("Имена выбравших подарки доступны вам.")}
           </p>
         </section>
       )}
       {data && owner && (
         <div className="wishlist-toolbar">
           <p>
-            Подарков: {data.total} · Выбрано: {data.reservedTotal}
+            {wishlistText("Подарков: ")}
+            {data.total}
+            {wishlistText(" · Выбрано: ")}
+            {data.reservedTotal}
           </p>
           <button
             className="primary"
             disabled={disabled}
             onClick={() => open(null)}
           >
-            + Добавить подарок
+            {wishlistText("+ Добавить подарок")}
           </button>
         </div>
       )}
       {pending && (
         <p role="status">
-          {data ? "Обновляем wishlist…" : "Загружаем wishlist…"}
+          {data
+            ? wishlistText("Обновляем wishlist…")
+            : wishlistText("Загружаем wishlist…")}
         </p>
       )}
       {data && (
         <>
-          {preview && <h2>Что подарить</h2>}
+          {preview && <h2>{wishlistText("Что подарить")}</h2>}
           <div className="gift-grid" aria-busy={pending}>
             {data.gifts.map((g) => (
               <GiftCard
@@ -272,18 +291,22 @@ export function WishlistScreen({
                       <button
                         className="secondary"
                         disabled={disabled}
-                        aria-label={`Редактировать подарок: ${g.title}`}
+                        aria-label={wishlistText("Редактировать подарок: {0}", [
+                          g.title,
+                        ])}
                         onClick={() => open(g)}
                       >
-                        Редактировать
+                        {wishlistText("Редактировать")}
                       </button>
                       <button
                         className="secondary danger"
                         disabled={disabled}
-                        aria-label={`Удалить подарок: ${g.title}`}
+                        aria-label={wishlistText("Удалить подарок: {0}", [
+                          g.title,
+                        ])}
                         onClick={() => open(g, true)}
                       >
-                        Удалить
+                        {wishlistText("Удалить")}
                       </button>
                     </div>
                   ) : undefined
@@ -293,11 +316,13 @@ export function WishlistScreen({
           </div>
           {!data.total && (
             <section className="panel">
-              <h2>Wishlist пока пуст</h2>
+              <h2>{wishlistText("Wishlist пока пуст")}</h2>
               <p>
                 {owner
-                  ? "Добавьте идеи подарков, чтобы гостям было проще выбрать."
-                  : "Организатор ещё не добавил идеи подарков."}
+                  ? wishlistText(
+                      "Добавьте идеи подарков, чтобы гостям было проще выбрать.",
+                    )
+                  : wishlistText("Организатор ещё не добавил идеи подарков.")}
               </p>
               {owner && (
                 <button
@@ -305,7 +330,7 @@ export function WishlistScreen({
                   disabled={disabled}
                   onClick={() => open(null)}
                 >
-                  Добавить подарок
+                  {wishlistText("Добавить подарок")}
                 </button>
               )}
             </section>
@@ -316,7 +341,7 @@ export function WishlistScreen({
               disabled={pending || offline || busy}
               onClick={() => load(true)}
             >
-              Показать ещё
+              {wishlistText("Показать ещё")}
             </button>
           )}
           {preview && (
@@ -324,7 +349,7 @@ export function WishlistScreen({
               className="secondary route-link"
               href={`/e/${eventKey}/wishlist`}
             >
-              Посмотреть wishlist
+              {wishlistText("Посмотреть wishlist")}
             </Link>
           )}
         </>
@@ -380,7 +405,7 @@ export function WishlistScreen({
             onSaved={() => {
               dialog.current?.close();
               setEditing(undefined);
-              setNotice("Подарок сохранён.");
+              setNotice(wishlistText("Подарок сохранён."));
               announceEventChange();
               void load();
             }}
@@ -388,13 +413,20 @@ export function WishlistScreen({
         )}
         {!unavailable && deleting && (
           <>
-            <h2 id="wishlist-dialog-title">Удалить подарок?</h2>
+            <h2 id="wishlist-dialog-title">
+              {wishlistText("Удалить подарок?")}
+            </h2>
             <p>{deleting.title}</p>
-            <p>Подарок исчезнет из wishlist. Отменить удаление нельзя.</p>
+            <p>
+              {wishlistText(
+                "Подарок исчезнет из wishlist. Отменить удаление нельзя.",
+              )}
+            </p>
             {confirmedReserved && (
               <p className="notice">
-                Этот подарок уже выбрал один из гостей. Всё равно удалить его?
-                Бронь будет аннулирована.
+                {wishlistText(
+                  "Этот подарок уже выбрал один из гостей. Всё равно удалить его? Бронь будет аннулирована.",
+                )}
               </p>
             )}
             {opError && (
@@ -420,14 +452,16 @@ export function WishlistScreen({
                     if (e instanceof WishlistError && e.status === 401) auth();
                     else
                       setOpError(
-                        "Не удалось загрузить подарок. Закройте диалог и повторите попытку.",
+                        wishlistText(
+                          "Не удалось загрузить подарок. Закройте диалог и повторите попытку.",
+                        ),
                       );
                   } finally {
                     setBusy(false);
                   }
                 }}
               >
-                Загрузить актуальный подарок
+                {wishlistText("Загрузить актуальный подарок")}
               </button>
             )}
             <div className="gift-dialog-actions">
@@ -450,13 +484,13 @@ export function WishlistScreen({
                 }
               >
                 {busy
-                  ? "Удаляем…"
+                  ? wishlistText("Удаляем…")
                   : attempt
-                    ? "Проверить сохранение"
-                    : "Удалить подарок"}
+                    ? wishlistText("Проверить сохранение")
+                    : wishlistText("Удалить подарок")}
               </button>
               <button className="secondary" disabled={busy} onClick={close}>
-                Отмена
+                {wishlistText("Отмена")}
               </button>
             </div>
           </>

@@ -670,7 +670,6 @@ try {
     owner.id,
     other.id,
     guest.id,
-    gift.id,
     wishlist.id,
     "Slice03 guest",
     "Slice02 smoke",
@@ -678,6 +677,9 @@ try {
     assert(!publicHtml.includes(privateValue));
     assert(!JSON.stringify(publicDto).includes(privateValue));
   }
+  // Slice06 renders public Gift links in SSR; the Event DTO still excludes Gift IDs.
+  assert(!JSON.stringify(publicDto).includes(gift.id));
+  assert(publicHtml.includes(`/wishlist/${gift.id}`));
   const [sessionCount] =
     await sql`SELECT count(*)::int AS count FROM app.guest_sessions WHERE guest_identity_id=${guest.id}`;
   assert.equal(sessionCount.count, 0);

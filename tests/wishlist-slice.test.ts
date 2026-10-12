@@ -233,6 +233,22 @@ it("runs gift ownership, CRUD, surprise, deletion confirmation, pagination and m
     ).toBe(409);
     const exposed = (await (await list(req("/wishlist"), params)).json()).data;
     expect(exposed.gifts[0].reserverDisplayName).toBe("Secret reserver");
+    const publicRevisionBeforeName = (await readWishlist(pid)).revision;
+    await q`UPDATE app.guest_identities SET display_name='Renamed reserver' WHERE id=${guest.id}`;
+    const ownerAfterName = (await (await list(req("/wishlist"), params)).json())
+      .data;
+    expect(ownerAfterName.revision).not.toBe(exposed.revision);
+    expect((await readWishlist(pid)).revision).toBe(publicRevisionBeforeName);
+    await q`UPDATE app.guest_identities SET display_name='Secret reserver' WHERE id=${guest.id}`;
+    const [delta] =
+      await q`INSERT INTO app.gifts(wishlist_id,title) VALUES((SELECT id FROM app.wishlists WHERE event_id=${other.id}),'Reservation delta') RETURNING id`;
+    await q`SELECT app.reserve_gift(${otherPid},${delta.id},${guest.id})`;
+    const beforeDelta = await readWishlist(otherPid);
+    await q`SELECT app.cancel_reservation(${otherPid},${delta.id},${guest.id})`;
+    await q`SELECT app.reserve_gift(${otherPid},${delta.id},${guest.id})`;
+    const afterDelta = await readWishlist(otherPid);
+    expect(afterDelta.reservedTotal).toBe(beforeDelta.reservedTotal);
+    expect(afterDelta.revision).not.toBe(beforeDelta.revision);
     const pub = (
       await (await publicList(req("/wishlist"), publicParams)).json()
     ).data;

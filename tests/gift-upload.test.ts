@@ -87,3 +87,26 @@ it("retries an incomplete upload on the same prepared asset and preserves errors
   });
   expect(cache.current!.ready).toBe(false);
 });
+it("keeps transport failures readable in Russian while preserving server error codes", async () => {
+  const { wishlistApi } = await import("@/lib/wishlist-client");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }),
+  );
+  await expect(wishlistApi("/test")).rejects.toThrow("Проверьте соединение");
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () =>
+      response(
+        { code: "VERSION_CONFLICT", message: "Данные изменились." },
+        409,
+      ),
+    ),
+  );
+  await expect(wishlistApi("/test")).rejects.toMatchObject({
+    code: "VERSION_CONFLICT",
+    status: 409,
+  });
+});

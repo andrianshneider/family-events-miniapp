@@ -1,4 +1,6 @@
 "use client";
+import { wishlistText } from "@/lib/wishlist-copy";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,7 +22,7 @@ export function GiftDetailScreen({
   const [gift, setGift] = useState(initial),
     [pending, setPending] = useState(false),
     [error, setError] = useState(
-      initial ? "" : "Не удалось загрузить подарок.",
+      initial ? "" : wishlistText("Не удалось загрузить подарок."),
     ),
     [unavailable, setUnavailable] = useState(false),
     [offline, setOffline] = useState(false);
@@ -41,7 +43,10 @@ export function GiftDetailScreen({
       if (e instanceof WishlistError && e.status === 404) {
         setGift(null);
         setUnavailable(true);
-      } else setError("Не удалось обновить подарок. Повторите попытку.");
+      } else
+        setError(
+          wishlistText("Не удалось обновить подарок. Повторите попытку."),
+        );
     } finally {
       flight.current = false;
       setPending(false);
@@ -81,11 +86,11 @@ export function GiftDetailScreen({
         </div>
       </header>
       <Link className="text-button back" href={`/e/${publicId}/wishlist`}>
-        ← К wishlist
+        {wishlistText("← К wishlist")}
       </Link>
       {offline && (
         <p className="notice">
-          Нет соединения. Показаны ранее загруженные сведения.
+          {wishlistText("Нет соединения. Показаны ранее загруженные сведения.")}
         </p>
       )}
       {error && (
@@ -96,20 +101,20 @@ export function GiftDetailScreen({
             disabled={offline || pending}
             onClick={load}
           >
-            Попробовать снова
+            {wishlistText("Попробовать снова")}
           </button>
         </div>
       )}
-      {pending && <p role="status">Обновляем подарок…</p>}
+      {pending && <p role="status">{wishlistText("Обновляем подарок…")}</p>}
       {unavailable ? (
         <>
-          <h1>Подарок недоступен</h1>
-          <p>Он был удалён или событие больше недоступно.</p>
+          <h1>{wishlistText("Подарок недоступен")}</h1>
+          <p>{wishlistText("Он был удалён или событие больше недоступно.")}</p>
           <Link
             href={`/e/${publicId}/wishlist`}
             className="secondary route-link"
           >
-            Посмотреть другие подарки
+            {wishlistText("Посмотреть другие подарки")}
           </Link>
         </>
       ) : (
@@ -121,7 +126,11 @@ export function GiftDetailScreen({
               {giftPrice(gift) && (
                 <p className="gift-price">{giftPrice(gift)}</p>
               )}
-              <p>{gift.reserved ? "✓ Уже выбран" : "Свободен"}</p>
+              <p>
+                {gift.reserved
+                  ? wishlistText("✓ Уже выбран")
+                  : wishlistText("Свободен")}
+              </p>
               {gift.comment && <p className="gift-comment">{gift.comment}</p>}
               {gift.externalUrl && (
                 <a
@@ -130,7 +139,7 @@ export function GiftDetailScreen({
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Посмотреть подарок (новая вкладка)
+                  {wishlistText("Посмотреть подарок (новая вкладка)")}
                 </a>
               )}
             </div>

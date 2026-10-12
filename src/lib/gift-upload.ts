@@ -1,3 +1,4 @@
+import { wishlistText } from "@/lib/wishlist-copy";
 import { wishlistApi, WishlistError } from "./wishlist-client";
 export type GiftUpload = {
   file: File;
@@ -51,10 +52,18 @@ export async function uploadGiftImage(
     headers: { "Content-Type": file.type, "x-upsert": "false" },
     body: file,
     signal: AbortSignal.timeout(60000),
+  }).catch(() => {
+    throw Error(
+      wishlistText(
+        "Не удалось загрузить фото. Проверьте соединение и повторите попытку.",
+      ),
+    );
   });
   if (!sent.ok && sent.status !== 409)
     throw Error(
-      "Не удалось загрузить фото. Прежнее фото сохранено; повторите попытку.",
+      wishlistText(
+        "Не удалось загрузить фото. Прежнее фото сохранено; повторите попытку.",
+      ),
     );
   await complete(p.assetId);
   p.ready = true;

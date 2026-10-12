@@ -1,4 +1,6 @@
 "use client";
+import { wishlistText } from "@/lib/wishlist-copy";
+
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { giftInput } from "@/lib/validation";
@@ -63,7 +65,9 @@ export function GiftForm({
       next.size < 1 ||
       next.size > 10485760
     ) {
-      setError("Выберите JPG, PNG или WebP до 10 MiB и 20 мегапикселей.");
+      setError(
+        wishlistText("Выберите JPG, PNG или WebP до 10 MiB и 20 мегапикселей."),
+      );
       return;
     }
     setFile(next);
@@ -95,13 +99,17 @@ export function GiftForm({
         fields[String(issue.path[0])] =
           (
             {
-              title: "Введите название от 2 до 120 символов.",
-              amount: "Укажите положительную цену с точностью до копеек.",
-              currency: "Выберите валюту.",
-              externalUrl: "Укажите HTTP/HTTPS ссылку без логина и пароля.",
-              comment: "Комментарий — до 300 символов.",
+              title: wishlistText("Введите название от 2 до 120 символов."),
+              amount: wishlistText(
+                "Укажите положительную цену с точностью до копеек.",
+              ),
+              currency: wishlistText("Выберите валюту."),
+              externalUrl: wishlistText(
+                "Укажите HTTP/HTTPS ссылку без логина и пароля.",
+              ),
+              comment: wishlistText("Комментарий — до 300 символов."),
             } as Record<string, string>
-          )[String(issue.path[0])] ?? "Проверьте поле.";
+          )[String(issue.path[0])] ?? wishlistText("Проверьте поле.");
       setErrors(fields);
       form.current
         ?.querySelector<HTMLElement>(`[name="${Object.keys(fields)[0]}"]`)
@@ -163,10 +171,14 @@ export function GiftForm({
       }
       setError(
         sent
-          ? "Результат сохранения пока неизвестен. Нажмите «Проверить сохранение», чтобы повторить ту же операцию без дубля."
+          ? wishlistText(
+              "Результат сохранения пока неизвестен. Нажмите «Проверить сохранение», чтобы повторить ту же операцию без дубля.",
+            )
           : caught instanceof Error && caught.name !== "TimeoutError"
             ? caught.message
-            : "Не удалось сохранить подарок. Поля сохранены; повторите попытку.",
+            : wishlistText(
+                "Не удалось сохранить подарок. Поля сохранены; повторите попытку.",
+              ),
       );
     } finally {
       busy.current = false;
@@ -184,11 +196,13 @@ export function GiftForm({
       }}
     >
       <h2 id="wishlist-dialog-title">
-        {gift ? "Редактировать подарок" : "Добавить подарок"}
+        {gift
+          ? wishlistText("Редактировать подарок")
+          : wishlistText("Добавить подарок")}
       </h2>
       {offline && (
         <p className="notice">
-          Нет соединения. Отправка доступна после подключения.
+          {wishlistText("Нет соединения. Отправка доступна после подключения.")}
         </p>
       )}
       {error && (
@@ -198,13 +212,14 @@ export function GiftForm({
       )}
       {conflict && (
         <p>
-          Закройте форму и откройте подарок заново, чтобы загрузить актуальные
-          значения. Текущие изменения не отправлены.
+          {wishlistText(
+            "Закройте форму и откройте подарок заново, чтобы загрузить актуальные значения. Текущие изменения не отправлены.",
+          )}
         </p>
       )}
       <fieldset disabled={disabled} className="gift-fields">
         <label className="field">
-          Название
+          {wishlistText("Название")}
           <input
             name="title"
             value={title}
@@ -218,15 +233,16 @@ export function GiftForm({
           </span>
         </label>
         <label className="field">
-          Фото
+          {wishlistText("Фото")}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
             onChange={(e) => choose(e.target.files?.[0])}
           />
           <span className="hint">
-            JPG/PNG/WebP, до 10 MiB и 20 мегапикселей. Проверим изображение на
-            сервере.
+            {wishlistText(
+              "JPG/PNG/WebP, до 10 MiB и 20 мегапикселей. Проверим изображение на сервере.",
+            )}
           </span>
         </label>
         {(preview || asset) && (
@@ -237,7 +253,7 @@ export function GiftForm({
               width={640}
               height={384}
               src={preview ?? `/api/v1/media/${asset}`}
-              alt="Фото подарка"
+              alt={wishlistText("Фото подарка")}
             />
             <button
               type="button"
@@ -249,7 +265,7 @@ export function GiftForm({
                 prepared.current = null;
               }}
             >
-              Убрать фото
+              {wishlistText("Убрать фото")}
             </button>
           </div>
         )}
@@ -259,7 +275,7 @@ export function GiftForm({
           </p>
         )}
         <label className="field">
-          Ссылка
+          {wishlistText("Ссылка")}
           <input
             name="externalUrl"
             type="text"
@@ -275,7 +291,7 @@ export function GiftForm({
         </label>
         <div className="gift-money">
           <label className="field">
-            Цена
+            {wishlistText("Цена")}
             <input
               name="amount"
               inputMode="decimal"
@@ -289,7 +305,7 @@ export function GiftForm({
             </span>
           </label>
           <label className="field">
-            Валюта
+            {wishlistText("Валюта")}
             <select
               name="currency"
               value={currency}
@@ -303,7 +319,7 @@ export function GiftForm({
           </label>
         </div>
         <label className="field">
-          Комментарий
+          {wishlistText("Комментарий")}
           <textarea
             name="comment"
             value={comment}
@@ -320,12 +336,12 @@ export function GiftForm({
       <div className="gift-dialog-actions">
         <button className="primary" disabled={pending || offline || conflict}>
           {pending
-            ? "Сохраняем…"
+            ? wishlistText("Сохраняем…")
             : attempt
-              ? "Проверить сохранение"
+              ? wishlistText("Проверить сохранение")
               : gift
-                ? "Сохранить"
-                : "Добавить подарок"}
+                ? wishlistText("Сохранить")
+                : wishlistText("Добавить подарок")}
         </button>
         <button
           type="button"
@@ -333,7 +349,7 @@ export function GiftForm({
           disabled={pending}
           onClick={onClose}
         >
-          Отмена
+          {wishlistText("Отмена")}
         </button>
       </div>
     </form>

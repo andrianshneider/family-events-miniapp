@@ -1,4 +1,5 @@
 import "server-only";
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 import type { Gift, Wishlist } from "@/lib/wishlist";
 import type { OrganizerPrincipal } from "@/types/principal";
@@ -13,6 +14,7 @@ import { ownedEvent, expectedVersion } from "../db/authorization";
 import { idempotent } from "../db/idempotency";
 import { AppError, unavailable } from "../errors";
 import { validPublicId } from "./public-events";
+import { setting } from "../config";
 const cursorSchema = z
   .object({
     context: z.string(),
@@ -95,7 +97,10 @@ export async function readWishlist(
     const e = await parent(tx, key, principal),
       limit = options.limit ?? 20;
     const [total] =
-      await tx`SELECT count(*)::int AS total,coalesce(sum(g.version),0)::text AS versions,count(*) FILTER(WHERE EXISTS(SELECT 1 FROM app.gift_reservations r WHERE r.gift_id=g.id AND r.status='active'))::int AS reserved FROM app.gifts g WHERE g.wishlist_id=${e.wishlist_id} AND g.deleted_at IS NULL`;
+      await tx`SELECT count(*)::int AS total,coalesce(sum(g.version),0)::text AS versions,count(*) FILTER(WHERE EXISTS(SELECT 1 FROM app.gift_reservations r WHERE r.gift_id=g.id AND r.status='active'))::int AS reserved,
+      coalesce((SELECT sum(r.version)::text FROM app.gift_reservations r JOIN app.gifts rg ON rg.id=r.gift_id WHERE rg.wishlist_id=${e.wishlist_id} AND rg.deleted_at IS NULL),'0') AS reservation_versions,
+      CASE WHEN ${Boolean(principal)} AND NOT ${e.hide_reserver_identity} THEN (SELECT coalesce(jsonb_agg(jsonb_build_array(ng.id,i.display_name) ORDER BY ng.id),'[]'::jsonb)::text FROM app.gifts ng JOIN app.gift_reservations nr ON nr.gift_id=ng.id AND nr.status='active' JOIN app.guest_identities i ON i.id=nr.guest_identity_id WHERE ng.wishlist_id=${e.wishlist_id} AND ng.deleted_at IS NULL) ELSE NULL END AS private_names
+      FROM app.gifts g WHERE g.wishlist_id=${e.wishlist_id} AND g.deleted_at IS NULL`;
     // CASE gates the name in SQL. Public and Surprise ON never select a reserver identity into the DTO.
     const rows =
       await tx`SELECT g.id,g.title,g.external_url,g.amount::text,g.currency,g.comment,g.version,g.image_asset_id,g.sort_order,to_char(g.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_time,
@@ -109,7 +114,20 @@ export async function readWishlist(
       event: { title: e.title },
       total: total.total,
       reservedTotal: total.reserved,
-      revision: `${e.version}:${total.total}:${total.versions}:${total.reserved}`,
+      revision: createHmac("sha256", setting("SESSION_SECRET"))
+        .update(
+          "wishlist-revision:" +
+            JSON.stringify([
+              key,
+              e.version,
+              total.total,
+              total.versions,
+              total.reserved,
+              total.reservation_versions,
+              total.private_names ?? null,
+            ]),
+        )
+        .digest("base64url"),
       gifts: page.map((r) =>
         projection(r, key, Boolean(principal), e.hide_reserver_identity),
       ),

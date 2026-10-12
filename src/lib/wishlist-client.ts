@@ -1,3 +1,4 @@
+import { wishlistText } from "@/lib/wishlist-copy";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Wishlist } from "./wishlist";
 import { watchEventChanges } from "./event-updates";
@@ -12,20 +13,29 @@ export class WishlistError extends Error {
   }
 }
 export async function wishlistApi<T>(path: string, init: RequestInit = {}) {
-  const response = await fetch(path, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(15000),
-    ...init,
-  });
-  const body = await response.json();
-  if (!response.ok)
-    throw new WishlistError(
-      response.status,
-      body.error?.code ?? "UNKNOWN",
-      body.error?.message ?? "Не удалось выполнить действие.",
-      body.error?.fieldErrors,
+  try {
+    const response = await fetch(path, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+      ...init,
+    });
+    const body = await response.json();
+    if (!response.ok)
+      throw new WishlistError(
+        response.status,
+        body.error?.code ?? "UNKNOWN",
+        body.error?.message ?? wishlistText("Не удалось выполнить действие."),
+        body.error?.fieldErrors,
+      );
+    return body.data as T;
+  } catch (error) {
+    if (error instanceof WishlistError) throw error;
+    throw Error(
+      wishlistText(
+        "Не удалось выполнить запрос. Проверьте соединение и повторите попытку.",
+      ),
     );
-  return body.data as T;
+  }
 }
 export async function organizerMutation<T>(
   path: string,
@@ -53,7 +63,9 @@ export function useWishlist(
   const [data, setData] = useState(initial),
     [pending, setPending] = useState(!initial),
     [error, setError] = useState(
-      initial ? "" : "Не удалось загрузить wishlist. Повторите попытку.",
+      initial
+        ? ""
+        : wishlistText("Не удалось загрузить wishlist. Повторите попытку."),
     ),
     [offline, setOffline] = useState(false),
     [unavailable, setUnavailable] = useState(false);
@@ -135,7 +147,9 @@ export function useWishlist(
           setError(
             caught instanceof Error && caught.name !== "TimeoutError"
               ? caught.message
-              : "Не удалось загрузить wishlist. Проверьте соединение и повторите попытку.",
+              : wishlistText(
+                  "Не удалось загрузить wishlist. Проверьте соединение и повторите попытку.",
+                ),
           );
       } finally {
         flight.current = false;

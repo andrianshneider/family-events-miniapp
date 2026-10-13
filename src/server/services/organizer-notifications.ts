@@ -37,7 +37,7 @@ export async function notificationSettings(
           id: h.id,
           state:
             new Date(h.expires_at).getTime() <= Date.now() &&
-            h.state !== "confirmed"
+            ["pending", "account_mismatch"].includes(h.state)
               ? "expired"
               : h.state,
           expiresAt: new Date(h.expires_at).toISOString(),
@@ -100,7 +100,7 @@ export async function beginNotificationHandoff(
     await ownedEvent(tx, p, eventId);
     await tx`UPDATE app.organizer_notification_handoffs SET state='cancelled' WHERE user_id=${p.userId} AND state IN('pending','account_mismatch')`;
     const [h] =
-      await tx`INSERT INTO app.organizer_notification_handoffs(token_hash,user_id,organizer_session_id,event_id,mode,expires_at) VALUES(${tokenHash(raw)},${p.userId},${p.sessionId},${eventId},${mode},now()+interval '10 minutes') RETURNING id,expires_at`;
+      await tx`INSERT INTO app.organizer_notification_handoffs(token_hash,user_id,organizer_session_id,event_id,mode,expires_at,created_at) VALUES(${tokenHash(raw)},${p.userId},${p.sessionId},${eventId},${mode},clock_timestamp()+interval '10 minutes',clock_timestamp()) RETURNING id,expires_at`;
     return {
       id: h.id,
       expiresAt: new Date(h.expires_at).toISOString(),
@@ -150,7 +150,7 @@ export async function confirmSignedPermission(
         "TELEGRAM_PERMISSION_REQUIRED",
         "Разблокируйте бота и разрешите сообщения заново.",
       );
-    await tx`INSERT INTO app.telegram_channels(user_id,chat_id,permission_granted_at,permission_source,delivery_state,last_verified_at) VALUES(${p.userId},${verified.telegramId},now(),'mini_app','ready',now()) ON CONFLICT(user_id) DO UPDATE SET permission_granted_at=now(),permission_source='mini_app',delivery_state='ready',last_verified_at=now()`;
+    await tx`INSERT INTO app.telegram_channels(user_id,chat_id,permission_granted_at,permission_source,delivery_state,last_verified_at) VALUES(${p.userId},${verified.telegramId},now(),'mini_app','ready',now()) ON CONFLICT(user_id) DO UPDATE SET chat_id=excluded.chat_id,permission_granted_at=now(),permission_source='mini_app',delivery_state='ready',last_verified_at=now()`;
     await tx`INSERT INTO app.notification_subscriptions(event_id,user_id,role,enabled,consented_at) VALUES(${eventId},${p.userId},'organizer',true,now()) ON CONFLICT(event_id,user_id,role) DO UPDATE SET enabled=true,consented_at=now(),revoked_at=NULL`;
     await tx`UPDATE app.organizer_notification_handoffs SET state='confirmed',consumed_at=now() WHERE id=${h.id}`;
     return { confirmed: true };

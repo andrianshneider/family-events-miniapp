@@ -222,7 +222,7 @@ try {
   const first = await data(await req(rsvp, a.cookie, "PUT", noPerm, a.csrf));
   assert.equal(
     (
-      await sql`SELECT id FROM app.notifications n JOIN app.notification_subscriptions s ON s.id=n.subscription_id WHERE s.event_id=${e.id}`
+      await sql`SELECT n.id FROM app.notifications n JOIN app.notification_subscriptions s ON s.id=n.subscription_id WHERE s.event_id=${e.id}`
     ).length,
     0,
   );
@@ -381,8 +381,8 @@ try {
   phase =
     "two independent worker connections and lease guard without sending Telegram messages";
   const claimed = await Promise.all([
-    worker`SELECT * FROM app.claim_notifications(3)`,
-    worker`SELECT * FROM app.claim_notifications(3)`,
+    worker`SELECT id,chat_id,payload,attempt,lease::text AS lease FROM app.claim_notifications(3)`,
+    worker`SELECT id,chat_id,payload,attempt,lease::text AS lease FROM app.claim_notifications(3)`,
   ]);
   assert.equal(claimed.flat().length, 1);
   const job = claimed.flat()[0];
@@ -391,7 +391,8 @@ try {
     rows[0].id,
     "Only the known synthetic job may be acknowledged",
   );
-  await worker`SELECT app.finish_notification(${job.id},${job.lease},NULL,'CANCELLED',1)`;
+  phase = "exact lease acknowledgement";
+  await worker`SELECT app.finish_notification(${job.id},${job.lease}::text::timestamptz,NULL,'CANCELLED',1)`;
   assert.equal(
     (await sql`SELECT status FROM app.notifications WHERE id=${job.id}`)[0]
       .status,
@@ -429,7 +430,9 @@ try {
     await req(settings, owner.cookie, "PUT", { enabled: true }, owner.csrf),
   );
   assert.equal(
-    (await worker`SELECT * FROM app.claim_notifications(3)`).length,
+    (
+      await worker`SELECT id,chat_id,payload,attempt,lease::text AS lease FROM app.claim_notifications(3)`
+    ).length,
     0,
   );
   phase = "expired handoff and opt-out intent cancellation";
@@ -437,7 +440,7 @@ try {
     await req(handoff, owner.cookie, "POST", { mode: "bot_start" }, owner.csrf),
     201,
   );
-  await sql`UPDATE app.organizer_notification_handoffs SET created_at=now()-interval '20 minutes',expires_at=now()-interval '1 second' WHERE id=${expired.id}`;
+  await sql`UPDATE app.organizer_notification_handoffs SET created_at=now()-interval '2 seconds',expires_at=now()-interval '1 second' WHERE id=${expired.id}`;
   assert.equal(
     (await data(await req(settings, owner.cookie))).handoff.state,
     "expired",
@@ -472,7 +475,45 @@ try {
   console.info(
     "PASS: staging actual owner/CSRF/signed permission/forgery checks, webhook/handoff account binding/expiry/replay, N1/N2 atomic dedup/no-op, private CTA payloads, independent worker claims/stale lease and opt-out. No Telegram messages sent to synthetic users. Real permission and delivery remain a separate user-assisted test.",
   );
-} catch {
+} catch (caught) {
+  const safeCode =
+    caught && typeof caught === "object" && "code" in caught
+      ? String(caught.code)
+      : "UNKNOWN";
+  console.error(
+    "Safe diagnostic code: " +
+      (/^[A-Z0-9_]{1,48}$/.test(safeCode) ? safeCode : "UNKNOWN"),
+  );
+  if (caught instanceof assert.AssertionError)
+    console.error({
+      actual:
+        typeof caught.actual === "number" || typeof caught.actual === "boolean"
+          ? caught.actual
+          : [
+                "pending",
+                "processing",
+                "cancelled",
+                "sent",
+                "ready",
+                "blocked",
+              ].includes(String(caught.actual))
+            ? caught.actual
+            : "suppressed",
+      expected:
+        typeof caught.expected === "number" ||
+        typeof caught.expected === "boolean"
+          ? caught.expected
+          : [
+                "pending",
+                "processing",
+                "cancelled",
+                "sent",
+                "ready",
+                "blocked",
+              ].includes(String(caught.expected))
+            ? caught.expected
+            : "suppressed",
+    });
   console.error(
     "Organizer notification staging smoke failed at: " +
       phase +

@@ -55,3 +55,11 @@ Local automated tests currently pass 46 tests / 20 files. New tests exercise act
 10. Repeat settings/CTA on iPhone Safari, Telegram and installed PWA: safe-area, native permission, offline/error/retry, same user and secure return path.
 
 Do not send cookies/initData/tokens or personal guest answers. Real messages/CTA and physical-device checks remain pending until user confirmation; do not mark the slice fully accepted beforehand.
+
+### Staging findings before final delivery test
+
+Initial business Preview `b675f95`, deployment `dpl_GkpE8FN72v5z7q3nw4fMju5X1AyY` READY with stable staging alias; both CI runs passed. Migration 009 applied: app tables=22, anon confirmation EXECUTE=false, worker EXECUTE=true. Scheduler remains paused while synthetic tests run. Auth/Event/Public Event/RSVP/wishlist/reservation hosted regressions passed with cleanup.
+
+Hosted worker test exposed a genuine driver boundary defect: even a text-selected lease was serialized as a timestamp parameter by postgres-js and lost microseconds. Exact DB equality rejected deliverable/acknowledgement; Telegram update acknowledgement had the same boundary. All worker calls now bind lease as text and explicitly cast text→timestamptz in SQL. The hosted test retains exact text and checks acknowledgement and stale-lease rejection. Expiry fixture preserves creation ordering; handoff creation uses clock_timestamp after serialization, and cancelled intents stay cancelled rather than displaying stale expiry. Final corrected Preview and hosted results follow below.
+
+A separate browser-created user test event «Проверка уведомлений — staging», 28 October 2026, is ready. Its notification screen was reviewed at width 390px. Existing bot channel is already confirmed; event subscription remains OFF pending explicit user permission for two test messages. Physical Telegram permission/message/CTA acceptance is still pending. Parallel edits to root HTML mockups/styles are preserved and excluded from implementation commits.

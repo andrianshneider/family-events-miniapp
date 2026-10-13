@@ -78,7 +78,7 @@ export async function processUpdates() {
       } catch {
         /* Retry without logging raw Telegram content. */
       }
-      await sql`SELECT app.finish_telegram_update(${job.bot_id},${job.update_id},${job.lease},${success})`;
+      await sql`SELECT app.finish_telegram_update(${job.bot_id},${job.update_id},${job.lease}::text::timestamptz,${success})`;
     }
     return { processed };
   } finally {

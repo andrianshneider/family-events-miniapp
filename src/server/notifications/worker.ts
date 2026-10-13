@@ -28,14 +28,14 @@ export async function deliver() {
       await sql`SELECT id,chat_id,payload,attempt,lease::text AS lease FROM app.claim_notifications(3)`;
     for (const job of jobs) {
       const [check] =
-        await sql`SELECT app.notification_deliverable(${job.id},${job.lease}) AS allowed`;
+        await sql`SELECT app.notification_deliverable(${job.id},${job.lease}::text::timestamptz) AS allowed`;
       if (!check.allowed) {
-        await sql`SELECT app.finish_notification(${job.id},${job.lease},NULL,'CANCELLED',1)`;
+        await sql`SELECT app.finish_notification(${job.id},${job.lease}::text::timestamptz,NULL,'CANCELLED',1)`;
         continue;
       }
       const payload = message.safeParse(job.payload);
       if (!payload.success) {
-        await sql`SELECT app.finish_notification(${job.id},${job.lease},NULL,'CANCELLED',1)`;
+        await sql`SELECT app.finish_notification(${job.id},${job.lease}::text::timestamptz,NULL,'CANCELLED',1)`;
         continue;
       }
       try {
@@ -60,7 +60,7 @@ export async function deliver() {
               }
             : {}),
         });
-        await sql`SELECT app.finish_notification(${job.id},${job.lease},${result.message_id},NULL,1)`;
+        await sql`SELECT app.finish_notification(${job.id},${job.lease}::text::timestamptz,${result.message_id},NULL,1)`;
         sent++;
       } catch (error) {
         const code =
@@ -70,7 +70,7 @@ export async function deliver() {
             ? error.retryAfter
             : Math.min(3600, 2 ** job.attempt * 30) +
               Math.floor(Math.random() * 10);
-        await sql`SELECT app.finish_notification(${job.id},${job.lease},NULL,${code},${delay})`;
+        await sql`SELECT app.finish_notification(${job.id},${job.lease}::text::timestamptz,NULL,${code},${delay})`;
       }
     }
     return { processed: jobs.length, sent };

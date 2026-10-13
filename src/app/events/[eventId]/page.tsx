@@ -18,7 +18,10 @@ export default async function EventPage({
   try {
     event = await organizerEvent(await organizer(), parsed.data);
   } catch (error) {
-    if (error instanceof AppError && error.status === 401) redirect("/login");
+    if (error instanceof AppError && error.status === 401)
+      redirect(
+        "/login?returnTo=" + encodeURIComponent(`/events/${parsed.data}`),
+      );
     if (error instanceof AppError && error.status === 404) notFound();
     throw error;
   }

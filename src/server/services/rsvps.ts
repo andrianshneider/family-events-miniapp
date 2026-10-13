@@ -11,6 +11,7 @@ import { setting } from "../config";
 import { AppError, unavailable, unauthenticated } from "../errors";
 import { idempotent } from "../db/idempotency";
 import { validPublicId } from "./public-events";
+import { organizerRsvpMessage } from "../notifications/templates";
 import { enqueue } from "../notifications/outbox";
 export function rsvpDto(row: Record<string, unknown>): Rsvp {
   return {
@@ -118,12 +119,11 @@ export async function saveRsvp(
           await tx`UPDATE app.notifications SET status='cancelled',locked_until=NULL WHERE type='reminder_24h' AND status IN('pending','processing') AND subscription_id IN(SELECT id FROM app.notification_subscriptions WHERE event_id=${event.id} AND guest_identity_id=${principal.guestIdentityId} AND role='guest')`;
         const subscriptions =
           await tx`SELECT s.id FROM app.notification_subscriptions s JOIN app.telegram_channels c ON c.user_id=s.user_id WHERE s.event_id=${event.id} AND s.user_id=${event.organizer_id} AND s.role='organizer' AND s.enabled AND s.consented_at IS NOT NULL AND s.revoked_at IS NULL AND c.delivery_state='ready' AND c.permission_granted_at IS NOT NULL FOR UPDATE OF s`;
-        const statusText = {
-          yes: "Будет",
-          no: "Не будет",
-          maybe: "Пока не знает",
-        }[normalized.status];
-        const message = `${old ? "Изменён ответ" : "Новый ответ"} на «${event.title}»\n${normalized.guestName}: ${statusText}${normalized.status === "no" ? "" : `\n${normalized.adultsCount} взрослых · ${normalized.childrenCount} детей`}`;
+        const message = organizerRsvpMessage(
+          String(event.title),
+          normalized,
+          old,
+        );
         for (const subscription of subscriptions)
           await enqueue(
             tx,
@@ -132,6 +132,10 @@ export async function saveRsvp(
             `rsvp:${saved.id}:v${saved.version}`,
             message,
             new Date().toISOString(),
+            {
+              label: old ? "Открыть гостей" : "Открыть событие",
+              path: `/events/${event.id}${old ? "/guests" : ""}`,
+            },
           );
         await tx`INSERT INTO app.analytics_events(name,event_id,guest_identity_id,occurred_at) VALUES(${old ? "rsvp_changed" : "rsvp_submitted"},${event.id},${principal.guestIdentityId},now())`;
         return { status: 200, body: { rsvp: rsvpDto(saved), changed: true } };

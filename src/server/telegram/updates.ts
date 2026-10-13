@@ -3,7 +3,7 @@ import "server-only";
 import postgres from "postgres";
 import { z } from "zod";
 import { setting } from "../config";
-import { decrypt } from "../auth/crypto";
+import { decrypt, tokenHash } from "../auth/crypto";
 const privateChat = z.object({
   id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   type: z.literal("private"),
@@ -13,11 +13,21 @@ const user = z.object({
 });
 const update = z.object({
   message: z
-    .object({ text: z.string().optional(), chat: privateChat, from: user })
+    .object({
+      text: z.string().optional(),
+      date: z.number().int().positive(),
+      write_access_allowed: z
+        .object({ from_request: z.boolean().optional() })
+        .passthrough()
+        .optional(),
+      chat: privateChat,
+      from: user,
+    })
     .optional(),
   my_chat_member: z
     .object({
       chat: privateChat,
+      date: z.number().int().positive(),
       new_chat_member: z.object({ status: z.string() }),
     })
     .optional(),
@@ -41,17 +51,27 @@ export async function processUpdates() {
         if (parsed.success) {
           const data = parsed.data;
           if (
-            data.message?.text === "/start" &&
+            data.message &&
+            /^\/start(?:@\w+)?$/.test(data.message.text ?? "") &&
             data.message.from.id === data.message.chat.id
           )
-            await sql`SELECT app.record_telegram_channel(${String(data.message.from.id)},${String(data.message.chat.id)},false)`;
+            await sql`SELECT app.record_telegram_channel_at(${String(data.message.from.id)},${String(data.message.chat.id)},false,${new Date(data.message.date * 1000)})`;
+          if (data.message && data.message.from.id === data.message.chat.id) {
+            const start = /^\/start(?:@\w+)? notify_([\w-]{43})$/.exec(
+              data.message.text ?? "",
+            );
+            if (start)
+              await sql`SELECT app.confirm_organizer_notification(${tokenHash(start[1])},${String(data.message.from.id)},${String(data.message.chat.id)},${new Date((data.message.date ?? 0) * 1000)},'bot_start')`;
+            if (data.message.write_access_allowed && data.message.date)
+              await sql`SELECT app.confirm_organizer_notification(NULL,${String(data.message.from.id)},${String(data.message.chat.id)},${new Date(data.message.date * 1000)},'mini_app')`;
+          }
           if (
             data.my_chat_member &&
             ["kicked", "left"].includes(
               data.my_chat_member.new_chat_member.status,
             )
           )
-            await sql`SELECT app.record_telegram_channel(${String(data.my_chat_member.chat.id)},${String(data.my_chat_member.chat.id)},true)`;
+            await sql`SELECT app.record_telegram_channel_at(${String(data.my_chat_member.chat.id)},${String(data.my_chat_member.chat.id)},true,${new Date(data.my_chat_member.date * 1000)})`;
         }
         success = true;
         processed++;

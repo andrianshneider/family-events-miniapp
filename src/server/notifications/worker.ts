@@ -4,7 +4,18 @@ import postgres from "postgres";
 import { z } from "zod";
 import { setting } from "../config";
 import { bot, BotError } from "../telegram/bot";
-const message = z.object({ text: z.string().min(1).max(4096) }).strict();
+const message = z
+  .object({
+    text: z.string().min(1).max(4096),
+    action: z
+      .object({
+        label: z.enum(["Открыть событие", "Открыть гостей"]),
+        path: z.string().regex(/^\/events\/[0-9a-f-]{36}(\/guests)?$/i),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
 export async function deliver() {
   const sql = postgres(setting("DATABASE_WORKER_URL"), {
     prepare: false,
@@ -31,6 +42,23 @@ export async function deliver() {
         const result = await bot<{ message_id: number }>("sendMessage", {
           chat_id: String(job.chat_id),
           text: payload.data.text,
+          ...(payload.data.action
+            ? {
+                reply_markup: {
+                  inline_keyboard: [
+                    [
+                      {
+                        text: payload.data.action.label,
+                        url: new URL(
+                          payload.data.action.path,
+                          setting("APP_URL"),
+                        ).href,
+                      },
+                    ],
+                  ],
+                },
+              }
+            : {}),
         });
         await sql`SELECT app.finish_notification(${job.id},${job.lease},${result.message_id},NULL,1)`;
         sent++;

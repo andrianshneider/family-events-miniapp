@@ -224,7 +224,25 @@ export function EventScreen({
                 : "Режим сюрприза выключен."}
             </p>
             <p>Выбрано: {event.wishlist.reserved}</p>
-            <Link className="secondary route-link" href={`/events/${event.id}/wishlist`}>Управлять wishlist</Link>
+            <Link
+              className="secondary route-link"
+              href={`/events/${event.id}/wishlist`}
+            >
+              Управлять wishlist
+            </Link>
+          </section>
+          <section className="panel">
+            <h2>Уведомления</h2>
+            <p className="muted">
+              Подключите Telegram, чтобы узнавать о новых и изменённых ответах
+              гостей.
+            </p>
+            <Link
+              className="secondary route-link"
+              href={`/events/${event.id}/notifications`}
+            >
+              Настроить уведомления
+            </Link>
           </section>
           <section className="panel">
             <h2>Пригласите близких</h2>

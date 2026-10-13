@@ -7,6 +7,7 @@ export async function enqueue(
   triggerKey: string,
   text: string,
   scheduledAt: string,
+  action?: { label: string; path: string },
 ) {
-  await tx`INSERT INTO app.notifications(subscription_id,type,trigger_key,payload,scheduled_at,next_attempt_at) VALUES(${subscriptionId},${type},${triggerKey},${tx.json({ text })},${scheduledAt},${scheduledAt}) ON CONFLICT(subscription_id,type,trigger_key) DO NOTHING`;
+  await tx`INSERT INTO app.notifications(subscription_id,type,trigger_key,payload,scheduled_at,next_attempt_at) VALUES(${subscriptionId},${type},${triggerKey},${tx.json({ text, ...(action ? { action } : {}) })},${scheduledAt},${scheduledAt}) ON CONFLICT(subscription_id,type,trigger_key) DO NOTHING`;
 }

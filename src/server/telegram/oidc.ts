@@ -12,6 +12,13 @@ const keys = createRemoteJWKSet(new URL(issuer + "/.well-known/jwks.json"));
 export function returnPath(value: string | null) {
   if (
     value &&
+    /^\/events\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(\/notifications)?$/i.test(
+      value,
+    )
+  )
+    return value;
+  if (
+    value &&
     /^\/events\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/guests(?:\?status=(yes|no|maybe))?$/i.test(
       value,
     )

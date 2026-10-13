@@ -66,7 +66,7 @@ export function GiftForm({
       next.size > 10485760
     ) {
       setError(
-        wishlistText("Выберите JPG, PNG или WebP до 10 MiB и 20 мегапикселей."),
+        wishlistText("Выберите JPG, PNG или WebP до 10 Мб и 20 мегапикселей."),
       );
       return;
     }
@@ -241,7 +241,7 @@ export function GiftForm({
           />
           <span className="hint">
             {wishlistText(
-              "JPG/PNG/WebP, до 10 MiB и 20 мегапикселей. Проверим изображение на сервере.",
+              "JPG/PNG/WebP, до 10 Мб и 20 мегапикселей. Проверим изображение на сервере.",
             )}
           </span>
         </label>
@@ -250,8 +250,8 @@ export function GiftForm({
             {/* Local selected file only; server URLs are owner protected. */}
             <Image
               unoptimized
-              width={640}
-              height={384}
+              width={480}
+              height={640}
               src={preview ?? `/api/v1/media/${asset}`}
               alt={wishlistText("Фото подарка")}
             />

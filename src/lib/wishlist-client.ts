@@ -89,7 +89,9 @@ export function useWishlist(
       }
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
       flight.current = true;
-      setPending(true);
+      // Background refresh keeps the existing list steady; only initial loading
+      // and explicit pagination need a visible loading state.
+      setPending(more || !current.current);
       const stamp = generation.current;
       const old = current.current,
         cursor = more ? old?.nextCursor : null;

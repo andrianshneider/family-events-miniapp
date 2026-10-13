@@ -327,7 +327,7 @@ export function CreateEventScreen({
       file.size > 10485760 ||
       !file.size
     ) {
-      setCoverError("Выберите JPG, PNG или WebP до 10 MiB.");
+      setCoverError("Выберите JPG, PNG или WebP до 10 Мб.");
       return;
     }
     uploadBusy.current = true;
@@ -640,7 +640,7 @@ export function CreateEventScreen({
                     )}
                   </div>
                   <p className="hint">
-                    Необязательно · JPG, PNG или WebP, до 10 MiB
+                    Необязательно · JPG, PNG или WebP, до 10 Мб
                   </p>
                   {coverError && (
                     <p role="alert" className="error">

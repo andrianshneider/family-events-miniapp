@@ -268,12 +268,8 @@ export function WishlistScreen({
           </button>
         </div>
       )}
-      {pending && (
-        <p role="status">
-          {data
-            ? wishlistText("Обновляем wishlist…")
-            : wishlistText("Загружаем wishlist…")}
-        </p>
+      {pending && !data && (
+        <p role="status">{wishlistText("Загружаем wishlist…")}</p>
       )}
       {data && (
         <>

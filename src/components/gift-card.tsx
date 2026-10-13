@@ -15,8 +15,8 @@ export function GiftImage({ gift }: { gift: Gift }) {
           key={`${gift.imageUrl}:${retry}`}
           unoptimized
           src={gift.imageUrl}
-          width={640}
-          height={384}
+          width={480}
+          height={640}
           alt={wishlistText("Фото подарка «{0}»", [gift.title])}
           onError={() => setFailed(gift.imageUrl)}
         />

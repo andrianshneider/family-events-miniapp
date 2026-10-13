@@ -13,7 +13,7 @@ export async function sanitizeImage(bytes: Buffer) {
     throw new AppError(
       422,
       "INVALID_IMAGE_SIZE",
-      "Максимальный размер — 10 MiB.",
+      "Максимальный размер — 10 Мб.",
     );
   try {
     const image = sharp(bytes, {

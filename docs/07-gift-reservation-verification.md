@@ -55,3 +55,17 @@ Hosted script `scripts/reservation-smoke.ts` targets existing staging only, uses
 12. **Telegram и PWA.** Повторите выбор/refresh/отмену на тестовом подарке в Mini App и установленной PWA. Проверьте safe-area, клавиатуру, длинное имя, прокрутку диалога и Back/Escape. Анонимная PWA может иметь отдельное хранилище cookies; одинаковое имя не связывает устройства.
 
 Физический iPhone, установленная PWA и реальный Telegram проходятся пользователем; автоматические проверки не заменяют эти взаимодействия. Не присылайте cookies/initData/секреты.
+
+## Final available verification — 13 October 2026
+
+Business commit: `9d3427e6ea7e3e7ee5935cb8a132e11c8839542c`. Vercel Preview `dpl_6cBxXQjdkQSVEEWYkE8hYf5xNSFu` READY, target=null, alias `family-events-staging.vercel.app`. [Deployment](https://vercel.com/ast-dbae/family-events-miniapp/6cBxXQjdkQSVEEWYkE8hYf5xNSFu). CI push `38366667165` and PR `38366674230`: success.
+
+All local checks passed: 42 tests / 18 files, lint, TypeScript/build, clean migrations / 21 tables / role isolation, server secret browser-bundle check. Migration 008 applied and grants verified on staging.
+
+Hosted `reservation-smoke.ts`: exit 0, actual parallel HTTP reserve gives one 201 and one 409; independent PostgreSQL transactions give one success and one 23505; exactly one active row. Reserve/cancel and Gift/Event deletion races, receipt replay, stale cancellation, session expiry/revocation/restart, RSVP-name reuse, no auto-RSVP, name/ID isolation, CSRF, Surprise API/SSR and identity-free analytics passed; scoped cleanup completed.
+
+Hosted regressions `rsvp-smoke.ts`, `wishlist-smoke.ts`, `create-event-smoke.ts` and `auth-smoke.ts`: exit 0 with cleanup. This covers RSVP/Guest List, wishlist/Storage/Surprise, Event/Public Event/Share/OG/deletion and auth/refresh/logout.
+
+Browser staging test: independent IAB and Chrome, IAB width 390px. Synthetic event/gift only. Verified initial anonymous read, name dialog, rejection of one-character name, real choice, success, own list after refresh, own detail, second browser occupied/disabled state without identity, cancellation confirmation/keep-choice, confirmed cancellation and second browser becoming free via polling. No registration required. Screenshots saved locally for user review. IAB viewport restored and temporary tabs closed. Physical iPhone/PWA/Telegram interactions remain manual, as distinguished above.
+
+Browser DB readback: one retained reservation history record, zero active after cancellation. Browser fixture and anonymous guest removed with owner/marker/time/identity guards. Final audit: zero remaining Slice07 synthetic users and zero browser test guests. No real user event or guest identity was modified by browser tests.

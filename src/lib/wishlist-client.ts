@@ -180,7 +180,7 @@ export function useWishlist(
     window.addEventListener("online", network);
     window.addEventListener("online", restore);
     window.addEventListener("offline", network);
-    const timer = window.setInterval(restore, owner ? 5000 : 30000),
+    const timer = window.setInterval(restore, owner || !preview ? 5000 : 30000),
       stop = watchEventChanges(restore);
     return () => {
       document.removeEventListener("visibilitychange", restore);
@@ -191,6 +191,6 @@ export function useWishlist(
       window.clearInterval(timer);
       stop();
     };
-  }, [initial, load, owner]);
+  }, [initial, load, owner, preview]);
   return { data, pending, error, offline, unavailable, load, clear };
 }

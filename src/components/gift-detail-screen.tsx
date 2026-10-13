@@ -1,4 +1,5 @@
 "use client";
+import { reservationText } from "@/lib/reservation-copy";
 import { wishlistText } from "@/lib/wishlist-copy";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -7,6 +8,8 @@ import { useRouter } from "next/navigation";
 import type { Gift } from "@/lib/wishlist";
 import { giftPrice } from "@/lib/wishlist";
 import { wishlistApi, WishlistError } from "@/lib/wishlist-client";
+import { ReservationAction, useReservations } from "./reservation-provider";
+import { watchEventChanges } from "@/lib/event-updates";
 import { GiftImage } from "./gift-card";
 import { TelegramBack } from "./telegram-back";
 export function GiftDetailScreen({
@@ -19,6 +22,10 @@ export function GiftDetailScreen({
   initial: Gift | null;
 }) {
   const router = useRouter();
+  const reservations = useReservations();
+  const mine = reservations?.context?.reservations.some(
+    (r) => r.giftId === giftId,
+  );
   const [gift, setGift] = useState(initial),
     [pending, setPending] = useState(false),
     [error, setError] = useState(
@@ -30,7 +37,7 @@ export function GiftDetailScreen({
   const load = useCallback(async () => {
     if (flight.current || !navigator.onLine) return;
     flight.current = true;
-    setPending(true);
+    setPending(!initial);
     try {
       setGift(
         await wishlistApi<Gift>(
@@ -51,7 +58,7 @@ export function GiftDetailScreen({
       flight.current = false;
       setPending(false);
     }
-  }, [giftId, publicId]);
+  }, [giftId, publicId, initial]);
   useEffect(() => {
     const network = () => setOffline(!navigator.onLine);
     network();
@@ -67,9 +74,11 @@ export function GiftDetailScreen({
     window.addEventListener("offline", network);
     window.addEventListener("online", restore);
     window.addEventListener("pageshow", show);
-    const t = setInterval(restore, 30000);
+    const t = setInterval(restore, 5000),
+      stop = watchEventChanges(restore);
     return () => {
       clearInterval(t);
+      stop();
       document.removeEventListener("visibilitychange", restore);
       window.removeEventListener("online", network);
       window.removeEventListener("offline", network);
@@ -79,7 +88,13 @@ export function GiftDetailScreen({
   }, [load, initial]);
   return (
     <main className="shell event-shell gift-detail-shell">
-      <TelegramBack onBack={() => router.push(`/e/${publicId}/wishlist`)} />
+      <TelegramBack
+        warnBeforeClose={reservations?.busy || reservations?.uncertain}
+        onBack={() => {
+          if (!reservations?.interceptBack())
+            router.push(`/e/${publicId}/wishlist`);
+        }}
+      />
       <header className="top">
         <div className="brand">
           <span aria-hidden="true">♡</span>Family Events
@@ -127,10 +142,13 @@ export function GiftDetailScreen({
                 <p className="gift-price">{giftPrice(gift)}</p>
               )}
               <p>
-                {gift.reserved
-                  ? wishlistText("✓ Уже выбран")
-                  : wishlistText("Свободен")}
+                {mine
+                  ? reservationText("Вы выбрали этот подарок")
+                  : gift.reserved
+                    ? wishlistText("✓ Уже выбран")
+                    : wishlistText("Свободен")}
               </p>
+              <ReservationAction gift={gift} detail />
               {gift.comment && <p className="gift-comment">{gift.comment}</p>}
               {gift.externalUrl && (
                 <a

@@ -1,6 +1,8 @@
 "use client";
+import { reservationText } from "@/lib/reservation-copy";
 import { wishlistText } from "@/lib/wishlist-copy";
 
+import { useReservations } from "./reservation-provider";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
@@ -50,6 +52,10 @@ export function GiftCard({
   actions?: React.ReactNode;
   showName?: boolean;
 }) {
+  const reservations = useReservations();
+  const mine = reservations?.context?.reservations.some(
+    (r) => r.giftId === gift.id,
+  );
   return (
     <article className="gift-card">
       <GiftImage gift={gift} />
@@ -68,9 +74,11 @@ export function GiftCard({
         </h2>
         {giftPrice(gift) && <p className="gift-price">{giftPrice(gift)}</p>}
         <p className="gift-status">
-          {gift.reserved
-            ? wishlistText("✓ Уже выбран")
-            : wishlistText("Свободен")}
+          {mine
+            ? reservationText("Вы выбрали этот подарок")
+            : gift.reserved
+              ? wishlistText("✓ Уже выбран")
+              : wishlistText("Свободен")}
         </p>
         {showName && gift.reserverDisplayName && (
           <p>

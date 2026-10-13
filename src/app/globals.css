@@ -829,3 +829,5 @@ a:focus-visible {
 .wishlist-preview > .route-link { margin-top:16px; }
 @media(min-width:768px) { .gift-grid {grid-template-columns:repeat(2,minmax(0,1fr));} .wishlist-toolbar {display:flex;justify-content:space-between;align-items:center;gap:16px;} .wishlist-toolbar .primary {width:auto;} }
 @media(min-width:1024px) { .gift-grid {grid-template-columns:repeat(3,minmax(0,1fr));} .gift-detail {grid-template-columns:1fr 1fr;} }
+
+.reservation-name { display:flex; flex-direction:column; gap:10px; }

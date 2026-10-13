@@ -12,6 +12,7 @@ import {
   WishlistError,
 } from "@/lib/wishlist-client";
 import { announceEventChange } from "@/lib/event-updates";
+import { ReservationAction, useReservations } from "./reservation-provider";
 import { GiftCard } from "./gift-card";
 import { GiftForm } from "./gift-form";
 import { TelegramBack } from "./telegram-back";
@@ -34,6 +35,7 @@ export function WishlistScreen({
   preview?: boolean;
 }) {
   const router = useRouter();
+  const reservations = useReservations();
   const { data, pending, error, offline, unavailable, load, clear } =
     useWishlist(eventKey, owner, initial, preview);
   const [editing, setEditing] = useState<Gift | null | undefined>(undefined),
@@ -305,6 +307,8 @@ export function WishlistScreen({
                         {wishlistText("Удалить")}
                       </button>
                     </div>
+                  ) : !preview ? (
+                    <ReservationAction gift={g} />
                   ) : undefined
                 }
               />
@@ -357,8 +361,15 @@ export function WishlistScreen({
   return (
     <main ref={screen} className="shell event-shell wishlist-shell">
       <TelegramBack
-        warnBeforeClose={busy || Boolean(attempt) || formUncertain}
+        warnBeforeClose={
+          busy ||
+          Boolean(attempt) ||
+          formUncertain ||
+          reservations?.busy ||
+          reservations?.uncertain
+        }
         onBack={() => {
+          if (reservations?.interceptBack()) return;
           if (busy) return;
           if (dialog.current?.open) close();
           else router.push(back);

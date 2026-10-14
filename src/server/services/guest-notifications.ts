@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { transaction, type Transaction } from "../db/client";
-import { token, tokenHash } from "../auth/crypto";
+import { token, tokenHash, encrypt, decrypt } from "../auth/crypto";
 import { createGuestSession } from "../auth/sessions";
 import { setting } from "../config";
 import { validateInitData } from "../telegram/init-data";
@@ -56,7 +56,7 @@ export async function guestNotificationSettings(
     const [s] =
       await tx`SELECT s.enabled,c.delivery_state,c.permission_granted_at FROM app.notification_subscriptions s LEFT JOIN app.telegram_channels c ON c.user_id=s.user_id WHERE s.event_id=${e.id} AND s.guest_identity_id=${g.id} AND s.role='guest' AND s.revoked_at IS NULL`;
     const [h] =
-      await tx`SELECT id,state,expires_at FROM app.auth_handoffs WHERE guest_session_id=${p.sessionId} AND event_id=${e.id} ORDER BY created_at DESC LIMIT 1`;
+      await tx`SELECT id,state,expires_at,token_ciphertext FROM app.auth_handoffs WHERE guest_session_id=${p.sessionId} AND event_id=${e.id} ORDER BY created_at DESC LIMIT 1`;
     const [u] = g.linked_user_id
       ? await tx`SELECT display_name FROM app.users WHERE id=${g.linked_user_id}`
       : [];
@@ -79,6 +79,12 @@ export async function guestNotificationSettings(
       handoff: h
         ? {
             id: h.id,
+            url:
+              h.state === "pending" &&
+              new Date(h.expires_at).getTime() > Date.now() &&
+              h.token_ciphertext
+                ? `https://t.me/${setting("TELEGRAM_BOT_USERNAME")}?start=guest_${decrypt(h.token_ciphertext)}`
+                : null,
             state:
               ["pending", "verified"].includes(h.state) &&
               new Date(h.expires_at).getTime() <= Date.now()
@@ -93,10 +99,18 @@ export async function beginGuestHandoff(p: GuestPrincipal, publicId: string) {
   return transaction(async (tx) => {
     const { g, e } = await current(tx, p, publicId);
     await tx`SELECT id FROM app.guest_sessions WHERE id=${p.sessionId} FOR UPDATE`;
+    const [existing] =
+      await tx`SELECT id,state,token_ciphertext FROM app.auth_handoffs WHERE guest_session_id=${p.sessionId} AND event_id=${e.id} AND state IN('pending','verified') AND expires_at>clock_timestamp() ORDER BY created_at DESC LIMIT 1 FOR UPDATE`;
+    if (existing?.state === "verified") return { id: existing.id, url: null };
+    if (existing?.token_ciphertext)
+      return {
+        id: existing.id,
+        url: `https://t.me/${setting("TELEGRAM_BOT_USERNAME")}?start=guest_${decrypt(existing.token_ciphertext)}`,
+      };
     await tx`UPDATE app.auth_handoffs SET state='cancelled' WHERE guest_session_id=${p.sessionId} AND state IN('pending','verified')`;
     const raw = token();
     const [h] =
-      await tx`INSERT INTO app.auth_handoffs(token_hash,guest_identity_id,guest_session_id,event_id,expires_at,created_at) VALUES(${tokenHash(raw)},${g.id},${p.sessionId},${e.id},clock_timestamp()+interval '10 minutes',clock_timestamp()) RETURNING id`;
+      await tx`INSERT INTO app.auth_handoffs(token_hash,token_ciphertext,guest_identity_id,guest_session_id,event_id,expires_at,created_at) VALUES(${tokenHash(raw)},${encrypt(raw)},${g.id},${p.sessionId},${e.id},clock_timestamp()+interval '10 minutes',clock_timestamp()) RETURNING id`;
     return {
       id: h.id,
       url: `https://t.me/${setting("TELEGRAM_BOT_USERNAME")}?start=guest_${raw}`,

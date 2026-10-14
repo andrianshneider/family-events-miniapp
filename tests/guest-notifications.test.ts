@@ -27,11 +27,13 @@ import {
   beginGuestHandoff,
   completeGuestHandoff,
   guestHandoffStatus,
+  guestNotificationSettings,
   setGuestSubscription,
 } from "@/server/services/guest-notifications";
 import { planReminders, decideChange } from "@/server/notifications/guest";
 it("requires source proof and explicit RSVP merge, preserves gifts and canonical sessions, schedules/deduplicates/cancels guest notifications", async () => {
   process.env.DATABASE_WORKER_URL = "postgres://unused";
+  process.env.AUTH_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   process.env.APP_URL = "https://example.test";
   process.env.TELEGRAM_BOT_USERNAME = "FamilyEventsMiniAppBot";
   const pg = await PGlite.create();
@@ -94,11 +96,14 @@ it("requires source proof and explicit RSVP merge, preserves gifts and canonical
     await pg.exec("SET ROLE fe_worker");
     expect(
       (
-        await q`SELECT app.verify_guest_handoff(${tokenHash(expired.url.split("guest_")[1])},7002,7002,now(),'Guest') AS ok`
+        await q`SELECT app.verify_guest_handoff(${tokenHash(expired.url!.split("guest_")[1])},7002,7002,now(),'Guest') AS ok`
       )[0].ok,
     ).toBe(false);
     await pg.exec("SET ROLE fe_server");
     const h = await beginGuestHandoff(p, pid);
+    const repeated = await beginGuestHandoff(p, pid);
+    expect(repeated).toEqual(h);
+    expect((await guestNotificationSettings(p, pid)).handoff?.url).toBe(h.url);
     await expect(
       completeGuestHandoff(p, pid, {
         handoffId: h.id,
@@ -106,7 +111,7 @@ it("requires source proof and explicit RSVP merge, preserves gifts and canonical
         choices: {},
       }),
     ).rejects.toBeDefined();
-    const raw = h.url.split("guest_")[1];
+    const raw = h.url!.split("guest_")[1];
     await pg.exec("SET ROLE fe_worker");
     expect(
       (
@@ -119,6 +124,7 @@ it("requires source proof and explicit RSVP merge, preserves gifts and canonical
       )[0].ok,
     ).toBe(false);
     await pg.exec("SET ROLE fe_server");
+    expect(await beginGuestHandoff(p, pid)).toEqual({ id: h.id, url: null });
     const proof = await guestHandoffStatus(p, pid, h.id);
     expect(proof.conflicts).toHaveLength(1);
     await expect(

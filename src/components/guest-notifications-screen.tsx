@@ -7,7 +7,7 @@ type Settings = {
   enabled: boolean;
   linkedName: string | null;
   channel: string;
-  handoff: { id: string; state: string } | null;
+  handoff: { id: string; state: string; url: string | null } | null;
 };
 type Proof = {
   id: string;
@@ -61,6 +61,7 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
         base + "/notification-subscription",
       );
       setData(s);
+      setUrl(s.handoff?.url ?? "");
       if (
         s.handoff &&
         ["pending", "verified", "expired"].includes(s.handoff.state)
@@ -171,12 +172,12 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
             throw e;
         }
       }
-      const h = await mutate<{ url: string }>(
+      const h = await mutate<{ url: string | null }>(
         base + "/notification-handoff",
         "POST",
         {},
       );
-      setUrl(h.url);
+      setUrl(h.url ?? "");
       setChoices({});
     });
   }
@@ -269,6 +270,21 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
                 >
                   Подтвердить и включить
                 </button>
+              </>
+            ) : proof?.state === "pending" ? (
+              <>
+                <p>
+                  Продолжите текущее подключение по кнопке «Открыть Telegram».
+                </p>
+                {!url && (
+                  <button
+                    className="primary"
+                    disabled={busy}
+                    onClick={() => void connect()}
+                  >
+                    Восстановить ссылку Telegram
+                  </button>
+                )}
               </>
             ) : data.enabled ? (
               <button

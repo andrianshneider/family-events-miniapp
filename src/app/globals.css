@@ -831,3 +831,13 @@ a:focus-visible {
 @media(min-width:1024px) { .gift-grid {grid-template-columns:repeat(3,minmax(0,1fr));} .gift-detail {grid-template-columns:1fr 1fr;} }
 
 .reservation-name { display:flex; flex-direction:column; gap:10px; }
+
+.connection-notice {
+  padding: 12px max(24px, env(safe-area-inset-right)) 12px
+    max(24px, env(safe-area-inset-left));
+  background: #fff3d8;
+  color: #59420c;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+}

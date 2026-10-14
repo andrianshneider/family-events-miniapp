@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import { PwaProvider } from "@/components/pwa-provider";
 export const metadata: Metadata = {
   title: "Family Events",
   applicationName: "Family Events",
@@ -33,7 +34,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           strategy="beforeInteractive"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <PwaProvider>{children}</PwaProvider>
+      </body>
     </html>
   );
 }

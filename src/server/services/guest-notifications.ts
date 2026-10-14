@@ -70,9 +70,12 @@ export async function guestNotificationSettings(
         s.delivery_state === "ready" &&
         !!s.permission_granted_at,
       linkedName: u?.display_name ?? null,
-      channel: channel?.permission_granted_at
-        ? channel.delivery_state
-        : "unknown",
+      channel:
+        channel?.delivery_state === "blocked"
+          ? "blocked"
+          : channel?.permission_granted_at
+            ? channel.delivery_state
+            : "unknown",
       handoff: h
         ? {
             id: h.id,

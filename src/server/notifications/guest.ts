@@ -21,8 +21,14 @@ export async function planReminders(tx: Transaction, eventId: string) {
   if (!at) return;
   const subs =
     await tx`SELECT s.id,r.status FROM app.notification_subscriptions s JOIN app.rsvps r ON r.event_id=s.event_id AND r.guest_identity_id=s.guest_identity_id JOIN app.telegram_channels c ON c.user_id=s.user_id WHERE s.event_id=${eventId} AND s.role='guest' AND s.enabled AND s.revoked_at IS NULL AND s.consented_at IS NOT NULL AND c.delivery_state='ready' AND c.permission_granted_at IS NOT NULL AND r.status IN('yes','maybe')`;
+  const dateLabel = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(e.event_date + "T12:00:00Z"));
   for (const s of subs) {
-    const text = `${s.status === "maybe" ? "🔔 Напоминание о мероприятии" : "🎉 Завтра"} ${e.title}\n${e.event_date}${e.start_time ? " · " + e.start_time.slice(0, 5) : ""}\nЧасовой пояс: ${e.timezone}${e.venue_name ? "\n" + e.venue_name : ""}${e.address ? "\n" + e.address : ""}`;
+    const text = `${s.status === "maybe" ? "🔔 Напоминание о мероприятии" : "🎉 Завтра"} ${e.title}\n${dateLabel}${e.start_time ? " · " + e.start_time.slice(0, 5) : ""}\nЧасовой пояс: ${e.timezone}${e.venue_name ? "\n" + e.venue_name : ""}${e.address ? "\n" + e.address : ""}`;
     await enqueue(tx, s.id, "reminder_24h", key, text, at, {
       label: "Открыть мероприятие",
       path: `/e/${e.public_id}`,

@@ -20,7 +20,7 @@ N4 is planned for yes/maybe with active event-scoped subscription/ready channel,
 
 ## Verification status
 
-Local: 48 tests passed, including restricted PostgreSQL canonical merge/conflict, session/reservation preservation, handoff expiry/replay/source isolation, N3 dedup/cross-owner, stable schedule versions, sent reminder not rearmed, no suppression, controlled worker acknowledgement/dedup/CTA, DST/date-only/overdue timing. Existing Slice01–08 tests passed. Type/lint/build/clean22-table migration and secret-bundle checks are recorded as completed when final run finishes. Mock Bot API is not real delivery proof.
+Local: 48 tests passed, including restricted PostgreSQL canonical merge/conflict, session/reservation preservation, handoff expiry/replay/source isolation, N3 dedup/cross-owner, stable schedule versions, sent reminder not rearmed, no suppression, controlled worker acknowledgement/dedup/CTA, DST/date-only/overdue timing. Existing Slice01–08 tests passed. Type/lint/build/clean22-table migration and secret-bundle checks passed. Mock Bot API is not real delivery proof.
 
 Staging publication/migration/HTTP smoke and real recipient verification are pending. Synthetic staging smoke requires paused scheduler and never sends Bot API messages; it cleans only its own fixtures. Production/main remain unchanged.
 
@@ -38,3 +38,11 @@ Staging publication/migration/HTTP smoke and real recipient verification are pen
 ## Limits
 
 One outbox job per business trigger and ordinary replay/worker dedup are enforced. Telegram Bot API cannot guarantee absolute exactly-once after an accepted send whose response is lost; retries may duplicate that ambiguous external send. Safari/PWA automatic return from Telegram is not platform-guaranteed; manual return restores server state. Gift reservation notifications are outside this slice.
+
+## Staging results — 14 October 2026
+
+Migration010 applied on existing staging. Business commit `fdec193`, deployment `dpl_FTnZyizbvxHo9Jz7MvLVenkRZQbn` READY. CI runs 38530030152 and 38530036951 succeeded. Hosted Guest notification smoke passed actual API source/CSRF/forged proof checks, trusted worker handoff expiry/replay flow, explicit merge conflict, N3 summary/replay, exact future schedule, reschedule cancellation, lease verification and opt-out. No Bot API was called for synthetic identities; scoped cleanup completed and minute scheduler restored active. Hosted RSVP and reservation regressions passed with cleanup.
+
+Browser automation could not initialize (desktop app-server unavailable); no physical UI acceptance is claimed. A separate public test event is prepared under a marked synthetic Organizer for real Guest delivery. The recipient must opt in from their own browser and confirm the actual Telegram account. A question requests explicit authorization for two messages (N3 + N4); neither has been sent yet. Private fixture credentials remain ignored, and public invitation is provided to the user for their device check.
+
+Staging infrastructure readback: app tables22; anon Guest handoff EXECUTE=false; worker EXECUTE=true; minute scheduler active=true; latest automatic HTTP response200, timed_out=false. Final UI hardening reports blocked channel distinctly, bounds native permission waiting and avoids overlapping status polls. Browser acceptance remains user-assisted.

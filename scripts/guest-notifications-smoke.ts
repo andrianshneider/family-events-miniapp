@@ -14,6 +14,16 @@ assert(
   dbUrl.hostname.includes(ref) ||
     decodeURIComponent(dbUrl.username).includes(ref),
 );
+for (const connection of [
+  process.env.DATABASE_WORKER_URL!,
+  process.env.DATABASE_ADMIN_URL!,
+]) {
+  const target = new URL(connection);
+  assert(
+    target.hostname.includes(ref) ||
+      decodeURIComponent(target.username).includes(ref),
+  );
+}
 const sql = postgres(process.env.DATABASE_URL!, {
     max: 1,
     prepare: false,

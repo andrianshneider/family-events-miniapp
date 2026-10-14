@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { wishlistApi, WishlistError } from "@/lib/wishlist-client";
 type Settings = {
   eventTitle: string;
@@ -52,7 +52,10 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
     [choices, setChoices] = useState<Record<string, "current" | "telegram">>(
       {},
     );
+  const flight = useRef(false);
   const load = useCallback(async () => {
+    if (flight.current) return;
+    flight.current = true;
     try {
       const s = await wishlistApi<Settings>(
         base + "/notification-subscription",
@@ -78,6 +81,8 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
         setProof(null);
         setUrl("");
       }
+    } finally {
+      flight.current = false;
     }
   }, [base]);
   useEffect(() => {
@@ -132,9 +137,21 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
         }
       ).Telegram?.WebApp;
       if (app?.initData && app.requestWriteAccess) {
-        const allowed = await new Promise<boolean>((r) =>
-          app.requestWriteAccess!(r),
-        );
+        const allowed = await new Promise<boolean>((resolve, reject) => {
+          const timeout = setTimeout(
+            () =>
+              reject(
+                Error(
+                  "Запрос разрешения не завершился. Повторите подключение.",
+                ),
+              ),
+            30000,
+          );
+          app.requestWriteAccess!((allowed) => {
+            clearTimeout(timeout);
+            resolve(allowed);
+          });
+        });
         if (!allowed)
           throw Error("Разрешение не выдано. Ответ и подарки сохранены.");
         try {
@@ -175,7 +192,11 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
       )}
       {!data ? (
         <>
-          <p>Проверяем подключение…</p>
+          <p>
+            {error
+              ? "Подключение пока недоступно. Ваш ответ и подарки сохранены."
+              : "Проверяем подключение…"}
+          </p>
           <button onClick={() => void load()}>Повторить</button>
         </>
       ) : (

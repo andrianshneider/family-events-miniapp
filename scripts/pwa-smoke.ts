@@ -1,5 +1,6 @@
 // Existing staging only. Synthetic fixture owners, gifts, reservations and Storage files.
 import nextEnv from "@next/env";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import postgres from "postgres";
 import sharp from "sharp";
 import assert from "node:assert/strict";
@@ -35,6 +36,19 @@ const tids = [0, 1].map(() =>
     String(BigInt("0x" + randomBytes(6).toString("hex")) + 1000000000000n),
   ),
   guestIds = new Set<string>();
+const fixturePath = `.secrets/pwa-smoke-${randomUUID()}.json`;
+async function remember() {
+  await mkdir(".secrets", { recursive: true, mode: 0o700 });
+  await writeFile(
+    fixturePath,
+    JSON.stringify({
+      tids,
+      guestIds: [...guestIds],
+      started: started.toISOString(),
+    }),
+    { mode: 0o600 },
+  );
+}
 let phase = "login";
 const budgets = new Map<string, { minute: number; count: number }>();
 const request = async (
@@ -175,9 +189,11 @@ async function guest() {
   const [row] =
     await sql`SELECT guest_identity_id FROM app.guest_sessions WHERE token_hash=${createHash("sha256").update(cookie.split("=")[1]).digest()}`;
   guestIds.add(row.guest_identity_id);
+  await remember();
   return { cookie, csrf };
 }
 try {
+  await remember();
   phase = "manifest, icons, worker and offline document";
   const manifestResponse = await request("/manifest.webmanifest");
   assert.equal(manifestResponse.status, 200);
@@ -245,9 +261,7 @@ try {
     201,
   );
   phase = "canonical share, anonymous invitation and nested routes";
-  const invitation = await data(
-    await request(base + "/share", owner.cookie),
-  );
+  const invitation = await data(await request(base + "/share", owner.cookie));
   assert.equal(invitation.publicUrl, root + `/e/${e.publicId}`);
   for (const path of [
     `/e/${e.publicId}`,
@@ -257,7 +271,13 @@ try {
     const response = await request(path);
     assert.equal(response.status, 200);
     assert(response.headers.get("x-robots-tag")?.includes("noindex"));
-    assert((await response.text()).includes("Slice10 PWA happy path"));
+    assert(
+      (await response.text()).includes(
+        path.endsWith(gift.id)
+          ? "Тестовый подарок PWA"
+          : "Slice10 PWA happy path",
+      ),
+    );
   }
   for (const a of [owner, second, third]) {
     const list = await data(await request("/api/v1/events", a.cookie));
@@ -438,6 +458,8 @@ try {
       await tx`DELETE FROM app.gifts WHERE wishlist_id IN(SELECT w.id FROM app.wishlists w JOIN app.events e ON e.id=w.event_id WHERE e.organizer_id=${owner.id})`;
       await tx`DELETE FROM app.analytics_events WHERE user_id=${owner.id} OR event_id IN(SELECT id FROM app.events WHERE organizer_id=${owner.id})`;
       await tx`DELETE FROM app.api_idempotency WHERE principal_key=${"organizer:" + owner.id}`;
+      await tx`DELETE FROM app.rsvps WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${owner.id})`;
+      await tx`DELETE FROM app.event_changes WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${owner.id})`;
       await tx`DELETE FROM app.wishlists WHERE event_id IN(SELECT id FROM app.events WHERE organizer_id=${owner.id})`;
       await tx`DELETE FROM app.events WHERE organizer_id=${owner.id}`;
       await tx`DELETE FROM app.media_assets WHERE owner_user_id=${owner.id}`;
@@ -446,7 +468,12 @@ try {
       await tx`DELETE FROM app.users WHERE id=${owner.id}`;
     });
   }
-  for (const id of guestIds)
+  for (const id of guestIds) {
+    await sql`DELETE FROM app.api_idempotency WHERE principal_key=${"guest:" + id}`;
+    await sql`DELETE FROM app.guest_sessions WHERE guest_identity_id=${id}`;
     await sql`DELETE FROM app.guest_identities WHERE id=${id} AND created_at>=${started}`;
+  }
   await sql.end();
+  await unlink(fixturePath);
+  console.info("Scoped synthetic fixture cleanup completed.");
 }

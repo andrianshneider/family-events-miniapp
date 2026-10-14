@@ -172,6 +172,16 @@ try {
   const h = await data(
     await req(base + "/notification-handoff", a.cookie, "POST", {}, a.csrf),
   );
+  const repeated = await data(
+    await req(base + "/notification-handoff", a.cookie, "POST", {}, a.csrf),
+  );
+  assert.equal(repeated.id, h.id);
+  assert.equal(repeated.url, h.url);
+  assert.equal(
+    (await data(await req(base + "/notification-subscription", a.cookie)))
+      .handoff.url,
+    h.url,
+  );
   const b = await guest();
   assert.equal(
     (await req(base + "/notification-handoff/" + h.id, b.cookie)).status,
@@ -194,6 +204,11 @@ try {
     await req(base + "/notification-handoff/" + h.id, a.cookie),
   );
   assert.equal(proof.state, "verified");
+  const preserved = await data(
+    await req(base + "/notification-handoff", a.cookie, "POST", {}, a.csrf),
+  );
+  assert.equal(preserved.id, h.id);
+  assert.equal(preserved.url, null);
   assert.deepEqual(proof.conflicts, []);
   const complete = await req(
     base + "/notification-complete",

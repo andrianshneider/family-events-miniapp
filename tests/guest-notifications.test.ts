@@ -137,6 +137,10 @@ it("requires source proof and explicit RSVP merge, preserves gifts and canonical
         String(owner.id),
       ),
     ).rejects.toMatchObject({ code: "GUEST_ACCOUNT_CONFLICT" });
+    expect((await guestNotificationSettings(p, pid)).channel).toBe("ready");
+    await q`UPDATE app.telegram_channels SET delivery_state='blocked',permission_granted_at=NULL WHERE user_id=${user.id}`;
+    expect((await guestNotificationSettings(p, pid)).channel).toBe("blocked");
+    await q`UPDATE app.telegram_channels SET delivery_state='ready',permission_granted_at=now() WHERE user_id=${user.id}`;
     const proof = await guestHandoffStatus(p, pid, h.id);
     expect(proof.conflicts).toHaveLength(1);
     await expect(

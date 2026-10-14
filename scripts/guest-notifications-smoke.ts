@@ -204,6 +204,11 @@ try {
     await req(base + "/notification-handoff/" + h.id, a.cookie),
   );
   assert.equal(proof.state, "verified");
+  assert.equal(
+    (await data(await req(base + "/notification-subscription", a.cookie)))
+      .channel,
+    "ready",
+  );
   const mixedCookie = a.cookie + "; " + owner;
   assert.equal(
     (await data(await req(base + "/notification-subscription", mixedCookie)))
@@ -394,6 +399,45 @@ try {
       await sql`SELECT count(*)::int AS n FROM app.notifications n JOIN app.notification_subscriptions s ON s.id=n.subscription_id WHERE s.event_id=${e.id} AND n.status IN('pending','processing')`
     )[0].n,
     0,
+  );
+  phase = "revoked bot permission recovery";
+  await worker`SELECT app.record_telegram_channel_at(${tids[1]},${tids[1]},true,now())`;
+  assert.equal(
+    (await data(await req(base + "/notification-subscription", a.cookie)))
+      .channel,
+    "blocked",
+  );
+  const renewed = await data(
+    await req(
+      base + "/notification-handoff",
+      a.cookie,
+      "POST",
+      { restart: true },
+      a.csrf,
+    ),
+  );
+  const renewHash = createHash("sha256")
+    .update(renewed.url.split("guest_")[1])
+    .digest();
+  assert.equal(
+    (
+      await worker`SELECT app.verify_guest_handoff(${renewHash},${tids[1]},${tids[1]},now(),'Slice09 smoke') AS ok`
+    )[0].ok,
+    true,
+  );
+  assert.equal(
+    (await data(await req(base + "/notification-subscription", a.cookie)))
+      .channel,
+    "ready",
+  );
+  await data(
+    await req(
+      base + "/notification-complete",
+      a.cookie,
+      "POST",
+      { handoffId: renewed.id, confirmAccount: true, choices: {} },
+      a.csrf,
+    ),
   );
   console.log(
     "PASS: real staging Guest Session/handoff/merge/N3/scheduling/lease/optout; no synthetic Bot API delivery",

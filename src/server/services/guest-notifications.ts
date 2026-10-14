@@ -61,8 +61,13 @@ export async function guestNotificationSettings(
     const [u] = g.linked_user_id
       ? await tx`SELECT display_name FROM app.users WHERE id=${g.linked_user_id}`
       : [];
-    const [channel] = g.linked_user_id
-      ? await tx`SELECT delivery_state,permission_granted_at FROM app.telegram_channels WHERE user_id=${g.linked_user_id}`
+    const channelUserId =
+      g.linked_user_id ??
+      (h?.state === "verified" && new Date(h.expires_at).getTime() > Date.now()
+        ? h.confirmed_user_id
+        : null);
+    const [channel] = channelUserId
+      ? await tx`SELECT delivery_state,permission_granted_at FROM app.telegram_channels WHERE user_id=${channelUserId}`
       : [];
     return {
       eventTitle: e.title,
@@ -101,14 +106,19 @@ export async function guestNotificationSettings(
     };
   });
 }
-export async function beginGuestHandoff(p: GuestPrincipal, publicId: string) {
+export async function beginGuestHandoff(
+  p: GuestPrincipal,
+  publicId: string,
+  restart = false,
+) {
   return transaction(async (tx) => {
     const { g, e } = await current(tx, p, publicId);
     await tx`SELECT id FROM app.guest_sessions WHERE id=${p.sessionId} FOR UPDATE`;
     const [existing] =
       await tx`SELECT id,state,token_ciphertext FROM app.auth_handoffs WHERE guest_session_id=${p.sessionId} AND event_id=${e.id} AND state IN('pending','verified') AND expires_at>clock_timestamp() ORDER BY created_at DESC LIMIT 1 FOR UPDATE`;
-    if (existing?.state === "verified") return { id: existing.id, url: null };
-    if (existing?.token_ciphertext)
+    if (!restart && existing?.state === "verified")
+      return { id: existing.id, url: null };
+    if (!restart && existing?.token_ciphertext)
       return {
         id: existing.id,
         url: `https://t.me/${setting("TELEGRAM_BOT_USERNAME")}?start=guest_${decrypt(existing.token_ciphertext)}`,

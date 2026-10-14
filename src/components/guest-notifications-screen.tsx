@@ -227,6 +227,31 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
             {proof?.state === "verified" ? (
               <>
                 <h3>Подтвердите аккаунт</h3>
+                {data.channel !== "ready" && (
+                  <div role="alert">
+                    <p>
+                      Аккаунт подтверждён, но разрешение на сообщения бота ещё
+                      не подтверждено или отозвано. Откройте новое подключение в
+                      Telegram и нажмите «Запустить».
+                    </p>
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() =>
+                        void action(async () => {
+                          const h = await mutate<{ url: string }>(
+                            base + "/notification-handoff",
+                            "POST",
+                            { restart: true },
+                          );
+                          setUrl(h.url);
+                        })
+                      }
+                    >
+                      Переподключить Telegram
+                    </button>
+                  </div>
+                )}
                 {data.accountConflict && (
                   <div role="alert">
                     <p>
@@ -283,6 +308,7 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
                   className="primary"
                   disabled={
                     busy ||
+                    data.channel !== "ready" ||
                     data.accountConflict ||
                     proof.conflicts.some((c) => !choices[c.event_id])
                   }

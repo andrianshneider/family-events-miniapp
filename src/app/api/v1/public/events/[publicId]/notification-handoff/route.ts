@@ -8,9 +8,16 @@ export const POST = (
 ) =>
   endpoint(async (req, id) => {
     const p = await guestNotificationMutation(req);
-    await input(req, z.object({}).strict());
+    const body = await input(
+      req,
+      z.object({ restart: z.boolean().optional() }).strict(),
+    );
     return reply(
-      await beginGuestHandoff(p, (await context.params).publicId),
+      await beginGuestHandoff(
+        p,
+        (await context.params).publicId,
+        body.restart === true,
+      ),
       id,
     );
   })(request);

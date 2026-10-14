@@ -204,6 +204,26 @@ try {
     await req(base + "/notification-handoff/" + h.id, a.cookie),
   );
   assert.equal(proof.state, "verified");
+  const mixedCookie = a.cookie + "; " + owner;
+  assert.equal(
+    (await data(await req(base + "/notification-subscription", mixedCookie)))
+      .accountConflict,
+    true,
+  );
+  const blocked = await req(
+    base + "/notification-complete",
+    mixedCookie,
+    "POST",
+    { handoffId: h.id, confirmAccount: true, choices: {} },
+    a.csrf,
+  );
+  assert.equal(blocked.status, 409);
+  assert.equal((await blocked.json()).error.code, "GUEST_ACCOUNT_CONFLICT");
+  assert.equal(
+    (await data(await req(base + "/notification-subscription", a.cookie)))
+      .accountConflict,
+    false,
+  );
   const preserved = await data(
     await req(base + "/notification-handoff", a.cookie, "POST", {}, a.csrf),
   );

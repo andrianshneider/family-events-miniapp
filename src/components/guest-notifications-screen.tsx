@@ -1,12 +1,17 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { wishlistApi, WishlistError } from "@/lib/wishlist-client";
+import {
+  wishlistApi,
+  WishlistError,
+  organizerMutation,
+} from "@/lib/wishlist-client";
 type Settings = {
   eventTitle: string;
   enabled: boolean;
   linkedName: string | null;
   channel: string;
+  accountConflict: boolean;
   handoff: { id: string; state: string; url: string | null } | null;
 };
 type Proof = {
@@ -48,6 +53,7 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
     [proof, setProof] = useState<Proof | null>(null),
     [url, setUrl] = useState(""),
     [error, setError] = useState(""),
+    [connectionError, setConnectionError] = useState(""),
     [busy, setBusy] = useState(false),
     [choices, setChoices] = useState<Record<string, "current" | "telegram">>(
       {},
@@ -72,9 +78,9 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
           ),
         );
       else setProof(null);
-      setError("");
+      setConnectionError("");
     } catch (e) {
-      setError(
+      setConnectionError(
         e instanceof Error ? e.message : "Не удалось проверить подключение.",
       );
       if (e instanceof WishlistError && e.status === 401) {
@@ -191,10 +197,15 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
           {error}
         </p>
       )}
+      {connectionError && (
+        <p role="alert" className="field-error">
+          {connectionError}
+        </p>
+      )}
       {!data ? (
         <>
           <p>
-            {error
+            {error || connectionError
               ? "Подключение пока недоступно. Ваш ответ и подарки сохранены."
               : "Проверяем подключение…"}
           </p>
@@ -216,6 +227,31 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
             {proof?.state === "verified" ? (
               <>
                 <h3>Подтвердите аккаунт</h3>
+                {data.accountConflict && (
+                  <div role="alert">
+                    <p>
+                      В браузере выполнен вход в другой аккаунт Organizer. Чтобы
+                      подключить выбранный гостевой аккаунт, выйдите из
+                      Organizer на этом устройстве. Ответ и подарки сохранятся.
+                    </p>
+                    <button
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() =>
+                        void action(async () => {
+                          await organizerMutation(
+                            "/api/auth/logout",
+                            "POST",
+                            {},
+                            crypto.randomUUID(),
+                          );
+                        })
+                      }
+                    >
+                      Выйти из Organizer и продолжить гостем
+                    </button>
+                  </div>
+                )}
                 <p>
                   Подключить Telegram «{proof.accountName}» к вашему ответу?
                 </p>
@@ -246,7 +282,9 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
                 <button
                   className="primary"
                   disabled={
-                    busy || proof.conflicts.some((c) => !choices[c.event_id])
+                    busy ||
+                    data.accountConflict ||
+                    proof.conflicts.some((c) => !choices[c.event_id])
                   }
                   onClick={() =>
                     void action(async () => {

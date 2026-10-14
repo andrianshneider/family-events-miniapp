@@ -1,7 +1,10 @@
 import { publicWishlistLimit } from "@/server/services/wishlist-api";
 import { endpoint, reply, input } from "@/server/api";
 import { guest } from "@/server/auth/sessions";
-import { guestNotificationMutation } from "@/server/services/guest-notification-api";
+import {
+  guestNotificationMutation,
+  currentOrganizerUser,
+} from "@/server/services/guest-notification-api";
 import { z } from "zod";
 import {
   guestNotificationSettings,
@@ -17,6 +20,7 @@ export const GET = (
       await guestNotificationSettings(
         await guest(),
         (await context.params).publicId,
+        await currentOrganizerUser(),
       ),
       id,
     );

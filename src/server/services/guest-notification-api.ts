@@ -1,5 +1,5 @@
 import "server-only";
-import { guest, GUEST_COOKIE } from "../auth/sessions";
+import { guest, GUEST_COOKIE, organizer } from "../auth/sessions";
 import { requireMutation } from "../auth/csrf";
 import { limit } from "../auth/rate-limit";
 export async function guestNotificationMutation(req: Request) {
@@ -17,4 +17,14 @@ export async function guestNotificationMutation(req: Request) {
     Number(process.env.GUEST_WRITE_IP_RATE_LIMIT ?? 100),
   );
   return p;
+}
+
+import { AppError } from "../errors";
+export async function currentOrganizerUser() {
+  try {
+    return (await organizer()).userId;
+  } catch (e) {
+    if (e instanceof AppError && e.status === 401) return null;
+    throw e;
+  }
 }

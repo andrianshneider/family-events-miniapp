@@ -50,13 +50,14 @@ async function current(tx: Transaction, p: GuestPrincipal, publicId: string) {
 export async function guestNotificationSettings(
   p: GuestPrincipal,
   publicId: string,
+  expectedUserId: string | null = null,
 ) {
   return transaction(async (tx) => {
     const { g, e } = await current(tx, p, publicId);
     const [s] =
       await tx`SELECT s.enabled,c.delivery_state,c.permission_granted_at FROM app.notification_subscriptions s LEFT JOIN app.telegram_channels c ON c.user_id=s.user_id WHERE s.event_id=${e.id} AND s.guest_identity_id=${g.id} AND s.role='guest' AND s.revoked_at IS NULL`;
     const [h] =
-      await tx`SELECT id,state,expires_at,token_ciphertext FROM app.auth_handoffs WHERE guest_session_id=${p.sessionId} AND event_id=${e.id} ORDER BY created_at DESC LIMIT 1`;
+      await tx`SELECT id,state,expires_at,token_ciphertext,confirmed_user_id FROM app.auth_handoffs WHERE guest_session_id=${p.sessionId} AND event_id=${e.id} ORDER BY created_at DESC LIMIT 1`;
     const [u] = g.linked_user_id
       ? await tx`SELECT display_name FROM app.users WHERE id=${g.linked_user_id}`
       : [];
@@ -65,6 +66,11 @@ export async function guestNotificationSettings(
       : [];
     return {
       eventTitle: e.title,
+      accountConflict: !!(
+        expectedUserId &&
+        h?.confirmed_user_id &&
+        h.confirmed_user_id !== expectedUserId
+      ),
       enabled:
         !!s?.enabled &&
         s.delivery_state === "ready" &&

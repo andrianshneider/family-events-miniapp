@@ -125,6 +125,18 @@ it("requires source proof and explicit RSVP merge, preserves gifts and canonical
     ).toBe(false);
     await pg.exec("SET ROLE fe_server");
     expect(await beginGuestHandoff(p, pid)).toEqual({ id: h.id, url: null });
+    expect(
+      (await guestNotificationSettings(p, pid, String(owner.id)))
+        .accountConflict,
+    ).toBe(true);
+    await expect(
+      completeGuestHandoff(
+        p,
+        pid,
+        { handoffId: h.id, confirmAccount: true, choices: {} },
+        String(owner.id),
+      ),
+    ).rejects.toMatchObject({ code: "GUEST_ACCOUNT_CONFLICT" });
     const proof = await guestHandoffStatus(p, pid, h.id);
     expect(proof.conflicts).toHaveLength(1);
     await expect(

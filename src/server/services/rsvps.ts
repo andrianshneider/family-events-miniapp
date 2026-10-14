@@ -12,6 +12,7 @@ import { AppError, unavailable, unauthenticated } from "../errors";
 import { idempotent } from "../db/idempotency";
 import { validPublicId } from "./public-events";
 import { organizerRsvpMessage } from "../notifications/templates";
+import { planReminders } from "../notifications/guest";
 import { enqueue } from "../notifications/outbox";
 export function rsvpDto(row: Record<string, unknown>): Rsvp {
   return {
@@ -117,6 +118,7 @@ export async function saveRsvp(
         await tx`UPDATE app.guest_identities SET display_name=${normalized.guestName} WHERE id=${principal.guestIdentityId}`;
         if (normalized.status === "no")
           await tx`UPDATE app.notifications SET status='cancelled',locked_until=NULL WHERE type='reminder_24h' AND status IN('pending','processing') AND subscription_id IN(SELECT id FROM app.notification_subscriptions WHERE event_id=${event.id} AND guest_identity_id=${principal.guestIdentityId} AND role='guest')`;
+        await planReminders(tx, event.id);
         const subscriptions =
           await tx`SELECT s.id FROM app.notification_subscriptions s JOIN app.telegram_channels c ON c.user_id=s.user_id WHERE s.event_id=${event.id} AND s.user_id=${event.organizer_id} AND s.role='organizer' AND s.enabled AND s.consented_at IS NOT NULL AND s.revoked_at IS NULL AND c.delivery_state='ready' AND c.permission_granted_at IS NOT NULL FOR UPDATE OF s`;
         const message = organizerRsvpMessage(

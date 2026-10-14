@@ -10,6 +10,7 @@ const privateChat = z.object({
 });
 const user = z.object({
   id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  first_name: z.string().optional(),
 });
 const update = z.object({
   message: z
@@ -60,6 +61,11 @@ export async function processUpdates() {
             const start = /^\/start(?:@\w+)? notify_([\w-]{43})$/.exec(
               data.message.text ?? "",
             );
+            const guestStart = /^\/start(?:@\w+)? guest_([\w-]{43})$/.exec(
+              data.message.text ?? "",
+            );
+            if (guestStart)
+              await sql`SELECT app.verify_guest_handoff(${tokenHash(guestStart[1])},${String(data.message.from.id)},${String(data.message.chat.id)},${new Date(data.message.date * 1000)},${data.message.from.first_name ?? "Гость Telegram"})`;
             if (start)
               await sql`SELECT app.confirm_organizer_notification(${tokenHash(start[1])},${String(data.message.from.id)},${String(data.message.chat.id)},${new Date((data.message.date ?? 0) * 1000)},'bot_start')`;
             if (data.message.write_access_allowed && data.message.date)

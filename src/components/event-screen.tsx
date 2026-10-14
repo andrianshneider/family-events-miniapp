@@ -233,6 +233,14 @@ export function EventScreen({
           </section>
           <section className="panel">
             <h2>Уведомления</h2>
+            {event.pendingChangeId && (
+              <Link
+                className="secondary route-link"
+                href={`/events/${event.id}/changes/${event.pendingChangeId}`}
+              >
+                Отправить гостям сохранённые изменения
+              </Link>
+            )}
             <p className="muted">
               Подключите Telegram, чтобы узнавать о новых и изменённых ответах
               гостей.

@@ -110,12 +110,43 @@ export function RsvpCard({
         !busy.current &&
         Date.now() - last.current > 1000
       )
-        void load().catch((e) => setError(e.message));
+        void load()
+          .then(async (current) => {
+            const app = (
+              window as Window & {
+                Telegram?: { WebApp?: { initData?: string } };
+              }
+            ).Telegram?.WebApp;
+            if (current.sessionState !== "none") return;
+            if (app?.initData) {
+              const auth = await fetch("/api/auth/telegram/mini-app", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ initData: app.initData }),
+                signal: AbortSignal.timeout(10000),
+              });
+              if (!auth.ok) return;
+            } else {
+              const me = await fetch("/api/v1/me", {
+                cache: "no-store",
+                signal: AbortSignal.timeout(10000),
+              });
+              if (!me.ok) return;
+            }
+            const prepared = await fetch("/api/guest/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+              signal: AbortSignal.timeout(10000),
+            });
+            if (prepared.ok) await load();
+          })
+          .catch((e) => setError(e.message));
     };
     const show = (e: PageTransitionEvent) => {
       if (e.persisted) restore();
     };
-    void load().catch((e) => setError(e.message));
+    restore();
     window.addEventListener("online", network);
     window.addEventListener("offline", network);
     window.addEventListener("online", restore);
@@ -470,6 +501,16 @@ export function RsvpCard({
           </p>
         </>
       )}
+      {context?.rsvp && (
+        <Link
+          className="secondary route-link"
+          href={`/e/${event.publicId}/notifications`}
+        >
+          {context.notificationsEnabled
+            ? "Настроить уведомления"
+            : "Получать напоминания в Telegram"}
+        </Link>
+      )}
       <dialog
         ref={dialog}
         className="rsvp-dialog"
@@ -494,7 +535,18 @@ export function RsvpCard({
               <p>Увидимся {eventDateLabel(event.eventDate)}.</p>
             )}
             <p>Ваш ответ: {context?.rsvp && rsvpLabels[context.rsvp.status]}</p>
-            <Link className="secondary route-link" href={`/e/${event.publicId}/wishlist`}>Посмотреть wishlist</Link>
+            <Link
+              className="primary route-link"
+              href={`/e/${event.publicId}/notifications`}
+            >
+              Получать напоминания в Telegram
+            </Link>
+            <Link
+              className="secondary route-link"
+              href={`/e/${event.publicId}/wishlist`}
+            >
+              Посмотреть wishlist
+            </Link>
             <button className="primary" autoFocus onClick={close}>
               К событию
             </button>

@@ -9,8 +9,17 @@ const message = z
     text: z.string().min(1).max(4096),
     action: z
       .object({
-        label: z.enum(["Открыть событие", "Открыть гостей"]),
-        path: z.string().regex(/^\/events\/[0-9a-f-]{36}(\/guests)?$/i),
+        label: z.enum([
+          "Открыть событие",
+          "Открыть гостей",
+          "Посмотреть событие",
+          "Открыть мероприятие",
+        ]),
+        path: z
+          .string()
+          .regex(
+            /^(?:\/events\/[0-9a-f-]{36}(\/guests)?|\/e\/[A-Za-z0-9_-]{22})$/i,
+          ),
       })
       .strict()
       .optional(),

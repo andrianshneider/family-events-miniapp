@@ -490,7 +490,11 @@ export function CreateEventScreen({
       allowExit.current = true;
       announceEventChange();
       window.location.replace(
-        `/events/${result.data.id}?${editing ? "updated" : "created"}=1`,
+        editing &&
+          result.data.changeId &&
+          result.data.notificationRecipientsCount > 0
+          ? `/events/${result.data.id}/changes/${result.data.changeId}`
+          : `/events/${result.data.id}?${editing ? "updated" : "created"}=1`,
       );
     } catch (caught) {
       setError(

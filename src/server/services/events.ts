@@ -6,6 +6,7 @@ import type { OrganizerPrincipal } from "@/types/principal";
 import { db, transaction } from "../db/client";
 import { idempotent } from "../db/idempotency";
 import { AppError, unavailable } from "../errors";
+import { planReminders } from "../notifications/guest";
 import { eventTimes } from "./time";
 import { rsvpDto } from "./rsvps";
 import { ownedEvent, expectedVersion } from "../db/authorization";
@@ -64,8 +65,11 @@ export async function updateEvent(
             .filter(([, [a, b]]) => a !== b)
             .map(([field, [before, after]]) => [field, { before, after }]),
         );
+        const scheduleChanged = ["eventDate", "startTime", "timezone"].some(
+          (field) => field in changes,
+        );
         const [event] =
-          await tx`UPDATE app.events SET title=${data.title},event_type=${data.eventType},event_date=${data.eventDate},start_time=${data.startTime ?? null},end_time=${data.endTime ?? null},timezone=${data.timezone},starts_at=${times.startsAt},ends_at=${times.endsAt},effective_at=${times.effectiveAt},venue_name=${data.venueName ?? null},address=${data.address ?? null},directions=${data.directions ?? null},description=${data.description ?? null},dress_code=${data.dressCode ?? null},latitude=${data.latitude ?? null},longitude=${data.longitude ?? null},cover_asset_id=${data.coverAssetId ?? null},version=version+1,updated_at=now() WHERE id=${eventId} AND organizer_id=${principal.userId} AND deleted_at IS NULL RETURNING id,version`;
+          await tx`UPDATE app.events SET schedule_version=schedule_version+${scheduleChanged ? 1 : 0}, title=${data.title},event_type=${data.eventType},event_date=${data.eventDate},start_time=${data.startTime ?? null},end_time=${data.endTime ?? null},timezone=${data.timezone},starts_at=${times.startsAt},ends_at=${times.endsAt},effective_at=${times.effectiveAt},venue_name=${data.venueName ?? null},address=${data.address ?? null},directions=${data.directions ?? null},description=${data.description ?? null},dress_code=${data.dressCode ?? null},latitude=${data.latitude ?? null},longitude=${data.longitude ?? null},cover_asset_id=${data.coverAssetId ?? null},version=version+1,updated_at=now() WHERE id=${eventId} AND organizer_id=${principal.userId} AND deleted_at IS NULL RETURNING id,version`;
         let changeId: string | null = null;
         const [recipients] =
           await tx`SELECT count(*)::int AS count FROM app.notification_subscriptions WHERE event_id=${eventId} AND role='guest' AND enabled=true AND revoked_at IS NULL`;
@@ -73,9 +77,8 @@ export async function updateEvent(
           const [change] =
             await tx`INSERT INTO app.event_changes(event_id,event_version,actor_user_id,changes,notify_decision,decided_at) VALUES(${eventId},${event.version},${principal.userId},${tx.json(changes)},${recipients.count ? "pending" : "skip"},${recipients.count ? null : new Date()}) RETURNING id`;
           changeId = change.id;
-          // Do not send notifications on save. Cancel obsolete pending reminders.
-          await tx`UPDATE app.notifications SET status='cancelled' WHERE type='reminder_24h' AND status='pending' AND subscription_id IN (SELECT id FROM app.notification_subscriptions WHERE event_id=${eventId})`;
         }
+        await planReminders(tx, eventId);
         return {
           status: 200,
           body: {
@@ -181,6 +184,7 @@ export async function organizerEvent(
 ) {
   const [row] =
     await db()`SELECT e.id,e.title,e.event_type,e.event_date::text,e.start_time::text,e.end_time::text,e.timezone,e.effective_at,e.venue_name,e.address,e.directions,e.description,e.dress_code,e.latitude,e.longitude,e.cover_asset_id,e.version,u.display_name,w.id AS wishlist_id,w.hide_reserver_identity,
+    (SELECT c.id FROM app.event_changes c WHERE c.event_id=e.id AND c.event_version=e.version AND c.notify_decision='pending' LIMIT 1) AS pending_change_id,
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='yes') AS yes,
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='no') AS no,
     (SELECT count(*)::int FROM app.rsvps r WHERE r.event_id=e.id AND r.status='maybe') AS maybe,
@@ -193,6 +197,7 @@ export async function organizerEvent(
   if (!row) throw unavailable();
   return {
     id: row.id as string,
+    pendingChangeId: row.pending_change_id as string | null,
     displayName: row.display_name as string,
     title: row.title as string,
     eventType: row.event_type as string,

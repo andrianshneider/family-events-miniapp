@@ -134,8 +134,9 @@ export async function queueHealth() {
     statuses: rows,
     alert: rows.some(
       (r) =>
-        ["pending", "processing"].includes(r.delivery_status) &&
-        r.oldest_seconds > 300,
+        r.delivery_status === "failed" ||
+        (["pending", "processing"].includes(r.delivery_status) &&
+          r.oldest_seconds > 300),
     ),
   };
 }

@@ -10,6 +10,11 @@ let permitted = false,
 const emitted = new Set<string>();
 export function analyticsPermission(value: boolean) {
   permitted = value;
+  if (!value) {
+    try {
+      sessionStorage.removeItem("fe-analytics-auth-attempt");
+    } catch {}
+  }
   window.dispatchEvent(new Event("fe-analytics-consent"));
 }
 export function clientPlatform() {
@@ -38,7 +43,7 @@ export async function capture(
     const response = await fetch("/api/analytics/context", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ locator, platform:clientPlatform() }),
+      body: JSON.stringify({ locator, platform: clientPlatform() }),
       cache: "no-store",
       signal: AbortSignal.timeout(5000),
     });
@@ -206,6 +211,7 @@ export function resetClientAnalytics() {
   navigationId = "";
   try {
     sessionStorage.removeItem("fe-analytics-entry");
+    sessionStorage.removeItem("fe-analytics-auth-attempt");
   } catch {}
 }
 export function useAnalyticsError(
@@ -225,4 +231,56 @@ export function useAnalyticsError(
     window.addEventListener("fe-analytics-consent", send);
     return () => window.removeEventListener("fe-analytics-consent", send);
   }, [operation, visible, key]);
+}
+export function startAuthenticationAttempt() {
+  if (!permitted) return;
+  try {
+    sessionStorage.setItem(
+      "fe-analytics-auth-attempt",
+      JSON.stringify({ id: crypto.randomUUID(), reported: false }),
+    );
+  } catch {}
+}
+export function useAuthenticationFailure(visible: boolean) {
+  useEffect(() => {
+    if (!visible) return;
+    const send = () => {
+      if (!permitted || document.visibilityState !== "visible") return;
+      let saved: { id: string; reported: boolean };
+      try {
+        saved = JSON.parse(
+          sessionStorage.getItem("fe-analytics-auth-attempt") ?? "null",
+        );
+        if (!saved?.id || saved.reported) return;
+      } catch {
+        return;
+      }
+      void capture(
+        "operation_failed",
+        {
+          operation: "authentication",
+          attempt_id: saved.id,
+          error_code: "UNAUTHENTICATED",
+          outcome: "failed",
+        },
+        undefined,
+        saved.id,
+      ).then((ok) => {
+        if (ok)
+          try {
+            sessionStorage.setItem(
+              "fe-analytics-auth-attempt",
+              JSON.stringify({ ...saved, reported: true }),
+            );
+          } catch {}
+      });
+    };
+    send();
+    window.addEventListener("fe-analytics-consent", send);
+    document.addEventListener("visibilitychange", send);
+    return () => {
+      window.removeEventListener("fe-analytics-consent", send);
+      document.removeEventListener("visibilitychange", send);
+    };
+  }, [visible]);
 }

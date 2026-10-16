@@ -1,5 +1,10 @@
 "use client";
-import {failure,telemetryHeaders} from "@/lib/analytics/client";
+import {
+  failure,
+  telemetryHeaders,
+  startAuthenticationAttempt,
+  useAuthenticationFailure,
+} from "@/lib/analytics/client";
 import { InstallHelp } from "./install-help";
 import Script from "next/script";
 import { useEffect, useState } from "react";
@@ -21,6 +26,7 @@ export function LoginScreen({
   initialError?: string;
   returnTo?: string;
 }) {
+  useAuthenticationFailure(!!initialError);
   const [pending, setPending] = useState(false);
   const [sdkReady, setSdkReady] = useState(false);
   const [error, setError] = useState(initialError);
@@ -74,7 +80,7 @@ export function LoginScreen({
       const response = await fetch("/api/auth/telegram/mini-app", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json",...telemetryHeaders() },
+        headers: { "Content-Type": "application/json", ...telemetryHeaders() },
         body: JSON.stringify({ initData: app.initData }),
         signal: AbortSignal.timeout(15000),
       });
@@ -96,7 +102,7 @@ export function LoginScreen({
       }
       window.location.replace(returnTo);
     } catch (e) {
-      failure("authentication",crypto.randomUUID(),undefined,e);
+      failure("authentication", crypto.randomUUID(), undefined, e);
       setError(e instanceof Error ? e.message : "Не удалось войти.");
       setPending(false);
     }
@@ -135,6 +141,7 @@ export function LoginScreen({
             event.preventDefault();
             return;
           }
+          if (!mini) startAuthenticationAttempt();
           if (mini) {
             event.preventDefault();
             void signIn();

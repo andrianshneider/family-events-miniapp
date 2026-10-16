@@ -1,4 +1,5 @@
 "use client";
+import {failure,telemetryHeaders} from "@/lib/analytics/client";
 import { reservationText } from "@/lib/reservation-copy";
 import {
   createContext,
@@ -267,6 +268,7 @@ export function ReservationProvider({
           "Content-Type": "application/json",
           "x-csrf-token": csrf.csrfToken,
           "idempotency-key": op.key,
+          ...telemetryHeaders(op.key),
         },
         body: JSON.stringify(op.body),
       });
@@ -292,6 +294,7 @@ export function ReservationProvider({
       );
       announceEventChange();
     } catch (e) {
+      if(op?.method==="POST")failure("gift_reserve",op.key,{kind:"public",id:publicId},e);
       if (
         e instanceof WishlistError &&
         e.status < 500 &&

@@ -1,3 +1,4 @@
+import {linkedGuest} from "../analytics/identity";
 import "server-only";
 import { z } from "zod";
 import { transaction, type Transaction } from "../db/client";
@@ -293,6 +294,7 @@ export async function completeGuestHandoff(
     const affected =
       await tx`SELECT event_id FROM app.rsvps WHERE guest_identity_id=${target} ORDER BY event_id`;
     for (const row of affected) await planReminders(tx, row.event_id);
+    await linkedGuest(tx,g.id,target,uid);
     const raw = await createGuestSession(tx, target);
     return { raw };
   });

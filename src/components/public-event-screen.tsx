@@ -1,4 +1,5 @@
 "use client";
+import {useAnalyticsError,useAnalyticsView} from "@/lib/analytics/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
 import { WishlistScreen } from "./wishlist-screen";
@@ -18,6 +19,8 @@ export function PublicEventScreen({
   const [unavailable, setUnavailable] = useState(false);
   const [pending, setPending] = useState(false);
   const [offline, setOffline] = useState(false);
+  useAnalyticsView("event_viewed",{kind:"public",id:initialEvent.publicId},{view_mode:"public"},!unavailable);
+  useAnalyticsError("event_view",unavailable,{kind:"public",id:initialEvent.publicId});
   const closeEvent = useCallback(() => setUnavailable(true), []);
   const flight = useRef(false),
     last = useRef(0);

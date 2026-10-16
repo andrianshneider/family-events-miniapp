@@ -1,4 +1,5 @@
 "use client";
+import {resetClientAnalytics} from "@/lib/analytics/client";
 import { watchEventChanges } from "@/lib/event-updates";
 import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState, useRef } from "react";
@@ -193,6 +194,7 @@ export function EventsScreen({
         headers: { "x-csrf-token": j.data.csrfToken },
       });
       if (!out.ok) throw Error("Не удалось выйти. Повторите попытку.");
+      resetClientAnalytics();
       window.location.replace("/login");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось выйти.");

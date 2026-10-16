@@ -12,7 +12,7 @@ try {
   const rows = await pg.query<{ tablename: string; rowsecurity: boolean }>(
     "SELECT tablename,rowsecurity FROM pg_tables WHERE schemaname='app'",
   );
-  assert.equal(rows.rows.length, 22);
+  assert.equal(rows.rows.length, 24);
   assert(rows.rows.every((r) => r.rowsecurity));
   for (const role of ["anon", "authenticated", "fe_worker"]) {
     await pg.exec("SET ROLE " + role);
@@ -125,7 +125,7 @@ try {
     0,
   );
   console.info(
-    "PASS: clean migrations, 22 tables, RLS/grants, reservation uniqueness/idempotency, own cancel, cross-owner delete, optimistic version, soft deletion, worker isolation.",
+    "PASS: clean migrations, 24 tables, RLS/grants, reservation uniqueness/idempotency, own cancel, cross-owner delete, optimistic version, soft deletion, worker isolation.",
   );
 } finally {
   await pg.close();

@@ -1,3 +1,5 @@
+import {success,actorRelation,optional} from "../analytics/journal";
+import {transferOrigin} from "../analytics/context";
 import "server-only";
 import { reserveInput, cancelInput } from "@/lib/reservation-validation";
 import { z } from "zod";
@@ -98,7 +100,7 @@ export async function mutateReservation(
               );
             if (target.status === "active") {
               await tx`SELECT app.cancel_reservation(${publicId},${giftId},${principal.guestIdentityId})`;
-              await tx`INSERT INTO app.analytics_events(name,event_id,occurred_at) VALUES('gift_unreserved',${event.id},now())`;
+              // P1 cancellation measurement remains deferred.
             }
             return {
               status: 200,
@@ -121,7 +123,8 @@ export async function mutateReservation(
           const [reservation] =
             await tx`SELECT * FROM app.reserve_gift(${publicId},${giftId},${principal.guestIdentityId})`;
           if (!old)
-            await tx`INSERT INTO app.analytics_events(name,event_id,occurred_at) VALUES('gift_reserved',${event.id},now())`;
+            await optional(tx,async save=>{await success(save,"gift_reserved",{event_id:event.id,gift_id:giftId,reservation_id:reservation.reservation_id??reservation.id,actor_relation:await actorRelation(save,event.id,undefined,principal.guestIdentityId)},undefined,principal.guestIdentityId);});
+          await optional(tx,save=>transferOrigin(save,undefined,principal.guestIdentityId));
           return {
             status: old ? 200 : 201,
             body: { reservation: dto(reservation) },

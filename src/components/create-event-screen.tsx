@@ -1,4 +1,5 @@
 "use client";
+import {capture,failure,telemetryHeaders} from "@/lib/analytics/client";
 import { announceEventChange, watchEventChanges } from "@/lib/event-updates";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -125,6 +126,7 @@ export function CreateEventScreen({
   const [coverError, setCoverError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const form = useRef<HTMLFormElement>(null);
+  const analyticsForm=useRef<string|null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelSource = useRef<HTMLElement | null>(null);
@@ -266,6 +268,7 @@ export function CreateEventScreen({
     return () => window.removeEventListener("beforeunload", before);
   }, [dirty]);
   function change(key: keyof Fields, value: string) {
+    if(!editing&&!analyticsForm.current){analyticsForm.current=crypto.randomUUID();void capture("event_creation_started",{form_instance_id:analyticsForm.current});}
     const next = { ...fieldsRef.current, [key]: value };
     fieldsRef.current = next;
     setFields(next);
@@ -385,6 +388,7 @@ export function CreateEventScreen({
     setError("");
     setFieldErrors({});
     let current = attempt;
+    let analyticsFailed=false;
     if (!current) {
       const payload = {
         ...fields,
@@ -394,6 +398,7 @@ export function CreateEventScreen({
       };
       const parsed = eventInput.safeParse(payload);
       if (!parsed.success) {
+        if(!editing)failure("event_create",crypto.randomUUID(),undefined,{code:"VALIDATION_ERROR"});
         const errors: Record<string, string[]> = {};
         for (const issue of parsed.error.issues) {
           const key = String(issue.path[0]);
@@ -432,6 +437,7 @@ export function CreateEventScreen({
             "Content-Type": "application/json",
             "x-csrf-token": csrf,
             "idempotency-key": current.key,
+            ...telemetryHeaders(current.key,analyticsForm.current??undefined),
           },
           body: JSON.stringify(
             editing
@@ -449,6 +455,7 @@ export function CreateEventScreen({
         },
       );
       const result = await response.json();
+      if(!response.ok&&!editing){analyticsFailed=true;failure("event_create",current.key,undefined,{code:result.error?.code});}
       if (response.status === 401) {
         persist(fields, current);
         allowExit.current = true;
@@ -497,6 +504,7 @@ export function CreateEventScreen({
           : `/events/${result.data.id}?${editing ? "updated" : "created"}=1`,
       );
     } catch (caught) {
+      if(!editing&&!analyticsFailed)failure("event_create",current?.key??crypto.randomUUID(),undefined,caught);
       setError(
         caught instanceof Error && caught.name === "Error"
           ? caught.message

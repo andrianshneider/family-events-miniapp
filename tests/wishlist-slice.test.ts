@@ -203,7 +203,7 @@ it("runs gift ownership, CRUD, surprise, deletion confirmation, pagination and m
     ).toHaveLength(1);
     expect(
       await q`SELECT id FROM app.analytics_events WHERE name='gift_created'`,
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     const [guest] =
       await q`INSERT INTO app.guest_identities(display_name) VALUES('Secret reserver') RETURNING id`;
     await q`SELECT app.reserve_gift(${pid},${gid},${guest.id})`;

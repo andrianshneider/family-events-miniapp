@@ -27,5 +27,6 @@ export const POST = (
     );
     const response = reply({ enabled: true }, id);
     sessionCookie(response, GUEST_COOKIE, result.raw, GUEST_TTL);
+    sessionCookie(response,"__Host-fe_analytics_reset","",0);
     return response;
   })(request);

@@ -1,4 +1,5 @@
 "use client";
+import {capture,failure,telemetryHeaders} from "@/lib/analytics/client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
@@ -189,6 +190,7 @@ export function RsvpCard({
             }
           : { ...empty, status, guestName: context.defaultName ?? "" },
       );
+    void capture("rsvp_started",{mode:context.rsvp?"edit":"create",form_instance_id:crypto.randomUUID(),initial_status:status},{kind:"public",id:event.publicId});
     setModalOpen(true);
     dialog.current?.showModal();
   }
@@ -230,6 +232,7 @@ export function RsvpCard({
     if (busy.current || offline || context?.sessionState === "lost" || conflict)
       return;
     let operation = attempt;
+    let analyticsFailed=false;
     const payload = {
       ...draft,
       adultsCount: draft.status === "no" ? 0 : draft.adultsCount,
@@ -239,6 +242,7 @@ export function RsvpCard({
     if (!operation) {
       const parsed = rsvpInput.safeParse(payload);
       if (!parsed.success) {
+        failure("rsvp_save",crypto.randomUUID(),{kind:"public",id:event.publicId},{code:"VALIDATION_ERROR"});
         const fieldErrors: Record<string, string> = {};
         for (const issue of parsed.error.issues)
           fieldErrors[String(issue.path[0])] =
@@ -310,11 +314,13 @@ export function RsvpCard({
           "Content-Type": "application/json",
           "x-csrf-token": token,
           "idempotency-key": operation.key,
+          ...telemetryHeaders(operation.key),
         },
         body: JSON.stringify(operation.payload),
         signal: AbortSignal.timeout(15000),
       });
       const result = await response.json();
+      if(!response.ok){analyticsFailed=true;failure("rsvp_save",operation.key,{kind:"public",id:event.publicId},{code:result.error?.code});}
       if (response.status === 404) {
         onUnavailable();
         return;
@@ -344,6 +350,7 @@ export function RsvpCard({
       setConflict(false);
       announceEventChange();
     } catch (caught) {
+      if(!analyticsFailed)failure("rsvp_save",operation?.key??crypto.randomUUID(),{kind:"public",id:event.publicId},caught);
       setError(
         sent
           ? "Результат пока неизвестен. Нажмите «Проверить сохранение»: повторим прежнюю операцию без дубля."

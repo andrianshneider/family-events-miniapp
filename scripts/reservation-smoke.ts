@@ -460,15 +460,7 @@ try {
   );
   const analytics =
     await sql`SELECT name,guest_identity_id,user_id,properties FROM app.analytics_events WHERE event_id=${e.id} AND name IN('gift_reserved','gift_unreserved')`;
-  assert(
-    analytics.length > 0 &&
-      analytics.every(
-        (x) =>
-          !x.guest_identity_id &&
-          !x.user_id &&
-          JSON.stringify(x.properties) === "{}",
-      ),
-  );
+  assert.equal(analytics.length,0); // This fixture never opted into analytics.
   console.info(
     "PASS: staging actual HTTP reserve/cancel, own context, name/RSVP/session/CSRF isolation, Surprise DTO and SSR privacy, receipts and stale cancellation, independent HTTP and PostgreSQL reservation races, reserve/cancel/delete races, expiry/revocation/restart and privacy-safe analytics.",
   );

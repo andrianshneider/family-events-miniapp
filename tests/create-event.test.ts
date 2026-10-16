@@ -241,7 +241,7 @@ it("creates real events atomically and enforces validation, idempotency and owne
         wishlists: number;
         analytics: number;
       }[];
-    expect(counts).toEqual({ events: 1, wishlists: 1, analytics: 1 });
+    expect(counts).toEqual({ events: 1, wishlists: 1, analytics: 0 });
     const read = await get(first.id);
     expect(read.status).toBe(200);
     expect(read.headers.get("cache-control")).toBe("private, no-store");

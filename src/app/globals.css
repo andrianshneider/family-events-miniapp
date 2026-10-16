@@ -841,3 +841,6 @@ a:focus-visible {
   font-size: 14px;
   line-height: 1.5;
 }
+
+.analytics-consent { margin: 20px auto; padding: 20px max(24px,env(safe-area-inset-right)) 20px max(24px,env(safe-area-inset-left)); max-width: 720px; font-size: 14px; line-height: 1.6; background: #f4edff; color: #302b3a; }
+.analytics-consent summary { min-height: 44px; cursor: pointer; }

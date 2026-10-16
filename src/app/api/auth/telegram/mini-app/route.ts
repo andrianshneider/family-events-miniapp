@@ -1,3 +1,4 @@
+import {analyticsCookie} from "@/server/analytics/identity";
 import { z } from "zod";
 import { cookies } from "next/headers";
 import { endpoint, input, reply } from "@/server/api";
@@ -25,6 +26,7 @@ export const POST = endpoint(async (request, id) => {
   const result = await loginMiniApp(user, data.initData, previous, reauth);
   const response = reply(result.user, id);
   sessionCookie(response, ORG_COOKIE, result.raw, ORG_TTL);
+  await analyticsCookie(response,"analyticsRaw" in result ? result.analyticsRaw as string|undefined : undefined);
   sessionCookie(response, REAUTH_COOKIE, "", 0);
   return response;
 });

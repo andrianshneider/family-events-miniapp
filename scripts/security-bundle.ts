@@ -13,6 +13,7 @@ const keys = [
   "SESSION_SECRET",
   "RATE_LIMIT_SECRET",
   "CRON_SECRET",
+  "POSTHOG_PROJECT_KEY",
   "TELEGRAM_WEBHOOK_SECRET",
 ];
 async function scan(dir: string) {

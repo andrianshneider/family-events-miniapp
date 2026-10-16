@@ -1,3 +1,4 @@
+import { resetAnalytics, analyticsCookie } from "@/server/analytics/identity";
 import { endpoint, reply } from "@/server/api";
 import {
   organizer,
@@ -20,7 +21,9 @@ export const POST = endpoint(async (request, id) => {
       await tx`UPDATE app.mini_app_logins SET reauth_hash=${tokenHash(reauth)} WHERE session_hash=${session.token_hash} AND expires_at>now() RETURNING digest`;
     return receipts.length > 0;
   });
+  const analyticsRaw = await transaction((tx) => resetAnalytics(tx));
   const response = reply({ loggedOut: true }, id);
+  await analyticsCookie(response, analyticsRaw, true);
   sessionCookie(response, ORG_COOKIE, "", 0);
   sessionCookie(
     response,

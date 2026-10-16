@@ -1,3 +1,5 @@
+import {success,optional,visitor,resolveActor} from "../analytics/journal";
+import {transferOrigin} from "../analytics/context";
 import "server-only";
 import { randomBytes } from "node:crypto";
 import type { z } from "zod";
@@ -165,7 +167,12 @@ export async function createEvent(
         const [event] =
           await tx`INSERT INTO app.events(organizer_id,public_id,title,event_type,event_date,start_time,end_time,timezone,starts_at,ends_at,effective_at,venue_name,address,directions,description,dress_code,latitude,longitude,cover_asset_id) VALUES(${principal.userId},${randomBytes(16).toString("base64url")},${data.title},${data.eventType},${data.eventDate},${data.startTime ?? null},${data.endTime ?? null},${data.timezone},${times.startsAt},${times.endsAt},${times.effectiveAt},${data.venueName ?? null},${data.address ?? null},${data.directions ?? null},${data.description ?? null},${data.dressCode ?? null},${data.latitude ?? null},${data.longitude ?? null},${data.coverAssetId ?? null}) RETURNING id,public_id,version`;
         await tx`INSERT INTO app.wishlists(event_id) VALUES(${event.id})`;
-        await tx`INSERT INTO app.analytics_events(name,event_id,user_id,occurred_at) VALUES('event_created',${event.id},${principal.userId},now())`;
+        await optional(tx,async save=>{await transferOrigin(save,principal.userId);});
+        await optional(tx,async save=>{
+        const [origin]=await save`SELECT origin_event_id,origin_first_seen_at FROM app.users WHERE id=${principal.userId}`;
+        await success(save,"event_created",{event_id:event.id,event_type:data.eventType,has_cover:!!data.coverAssetId,has_location:!!(data.venueName||data.address),...(origin?.origin_event_id?{origin_event_id:origin.origin_event_id,origin_first_seen_at:new Date(origin.origin_first_seen_at).toISOString()}: {})},principal.userId);
+        const v=await visitor(save);if(v){const actor=await resolveActor(save,v,principal.userId);if(actor)await save`INSERT INTO app.analytics_events(name,visitor_id,distinct_id,user_id,schema_version,properties,occurred_at,delivery_status) VALUES('$identify',${v.id},${principal.userId},${principal.userId},'1.0',${save.json({$set:{has_created_event:true}})},now(),'pending')`; }
+        });
         return {
           status: 201,
           body: {

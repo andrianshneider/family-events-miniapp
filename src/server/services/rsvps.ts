@@ -1,3 +1,5 @@
+import {success,actorRelation,optional} from "../analytics/journal";
+import {transferOrigin} from "../analytics/context";
 import "server-only";
 import { cookies } from "next/headers";
 import { createHmac } from "node:crypto";
@@ -139,7 +141,8 @@ export async function saveRsvp(
               path: `/events/${event.id}${old ? "/guests" : ""}`,
             },
           );
-        await tx`INSERT INTO app.analytics_events(name,event_id,guest_identity_id,occurred_at) VALUES(${old ? "rsvp_changed" : "rsvp_submitted"},${event.id},${principal.guestIdentityId},now())`;
+        if(!old)await optional(tx,async save=>{await success(save,"rsvp_submitted",{event_id:event.id,rsvp_id:saved.id,rsvp_version:saved.version,status:normalized.status,actor_relation:await actorRelation(save,event.id,undefined,principal.guestIdentityId)},undefined,principal.guestIdentityId);});
+        await optional(tx,save=>transferOrigin(save,undefined,principal.guestIdentityId));
         return { status: 200, body: { rsvp: rsvpDto(saved), changed: true } };
       },
     );

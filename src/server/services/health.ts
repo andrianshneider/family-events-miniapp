@@ -5,7 +5,7 @@ import { storage, mediaBucket } from "../storage/client";
 export async function infrastructureHealth() {
   const [database] =
     await db()`SELECT count(*)::int AS tables FROM information_schema.tables WHERE table_schema='app'`;
-  if (database.tables !== 22) throw new Error("Unexpected database schema");
+  if (database.tables !== 24) throw new Error("Unexpected database schema");
   const { data, error } = await storage().getBucket(mediaBucket());
   if (error || !data || data.public)
     throw new Error("Private storage unavailable");

@@ -216,7 +216,7 @@ export async function createGift(
         if (!w) throw unavailable();
         const [g] =
           await tx`INSERT INTO app.gifts(wishlist_id,title,external_url,amount,currency,comment,image_asset_id) VALUES(${w.id},${n.title},${n.externalUrl},${n.amount},${n.currency},${n.comment},${n.imageAssetId}) RETURNING id,version`;
-        await tx`INSERT INTO app.analytics_events(name,event_id,user_id,occurred_at) VALUES('gift_created',${eventId},${principal.userId},now())`;
+        // P1 wishlist_item_added remains deferred; no unconsented legacy producer.
         return {
           status: 201,
           body: { id: g.id as string, version: g.version as number },

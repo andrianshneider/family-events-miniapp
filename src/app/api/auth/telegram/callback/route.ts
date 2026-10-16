@@ -1,3 +1,4 @@
+import {analyticsCookie} from "@/server/analytics/identity";
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { endpoint } from "@/server/api";
@@ -30,6 +31,7 @@ export const GET = endpoint(async (request) => {
   const result = await login(user, previous ? tokenHash(previous) : undefined);
   const response = NextResponse.redirect(new URL(path, setting("APP_URL")));
   sessionCookie(response, ORG_COOKIE, result.raw, ORG_TTL);
+  await analyticsCookie(response,"analyticsRaw" in result ? result.analyticsRaw as string|undefined : undefined);
   sessionCookie(response, "__Host-fe_oidc", "", 0);
   response.headers.set("Cache-Control", "no-store");
   return response;

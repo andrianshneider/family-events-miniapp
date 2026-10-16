@@ -1,4 +1,5 @@
 "use client";
+import {capture,failure,clientPlatform} from "@/lib/analytics/client";
 import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -98,6 +99,7 @@ export function ShareEventScreen({
     };
   }, [refresh]);
   async function copy() {
+    const analyticsAttempt=crypto.randomUUID();
     if (busy.current) return;
     busy.current = true;
     setAction("copy");
@@ -105,8 +107,10 @@ export function ShareEventScreen({
     setError("");
     try {
       await copyInvitation(data.publicUrl, navigator.clipboard);
+      void capture("invitation_link_copied",{share_channel:"copy",attempt_id:analyticsAttempt},{kind:"management",id:eventId});
       setFeedback("Ссылка скопирована");
     } catch {
+      failure("invitation_copy",analyticsAttempt,{kind:"management",id:eventId});
       setError(
         "Не удалось скопировать автоматически. Ссылка выделена — скопируйте её вручную.",
       );
@@ -119,6 +123,8 @@ export function ShareEventScreen({
   }
   async function share() {
     if (busy.current || offline) return;
+    const analyticsAttempt=crypto.randomUUID(),channel=clientPlatform()==="telegram"?"telegram":"native";
+    void capture("share_initiated",{share_channel:channel,attempt_id:analyticsAttempt},{kind:"management",id:eventId});
     busy.current = true;
     setAction("share");
     setFeedback("");
@@ -138,11 +144,13 @@ export function ShareEventScreen({
         share: navigator.share?.bind(navigator),
         telegram: app?.initData ? app : undefined,
       });
+      void capture("share_result",{share_channel:channel,attempt_id:analyticsAttempt,outcome:result},{kind:"management",id:eventId});
       if (result === "unsupported")
         setFeedback(
           "Системное меню отправки недоступно. Скопируйте ссылку или откройте Telegram.",
         );
     } catch {
+      void capture("share_result",{share_channel:channel,attempt_id:analyticsAttempt,outcome:"failed",error_code:"UNKNOWN"},{kind:"management",id:eventId});
       setError(
         "Не удалось открыть отправку. Скопируйте ссылку или попробуйте Telegram.",
       );
@@ -167,10 +175,11 @@ export function ShareEventScreen({
         };
       }
     ).Telegram?.WebApp;
-    if (app?.initData && app.openTelegramLink) {
-      e.preventDefault();
-      app.openTelegramLink(telegramShareUrl(data));
-    }
+    const attempt=crypto.randomUUID();
+    void capture("share_initiated",{share_channel:"telegram",attempt_id:attempt},{kind:"management",id:eventId});
+    try {if (app?.initData && app.openTelegramLink) {e.preventDefault();app.openTelegramLink(telegramShareUrl(data));}
+      void capture("share_result",{share_channel:"telegram",attempt_id:attempt,outcome:"ready"},{kind:"management",id:eventId});
+    }catch {e.preventDefault();void capture("share_result",{share_channel:"telegram",attempt_id:attempt,outcome:"failed",error_code:"UNKNOWN"},{kind:"management",id:eventId});}
   }
   return (
     <main className="shell event-shell share-shell">

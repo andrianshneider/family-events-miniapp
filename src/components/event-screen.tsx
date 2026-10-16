@@ -1,4 +1,5 @@
 "use client";
+import {useAnalyticsError,useAnalyticsView} from "@/lib/analytics/client";
 import Link from "next/link";
 import { watchEventChanges } from "@/lib/event-updates";
 import Image from "next/image";
@@ -26,6 +27,8 @@ export function EventScreen({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
+  useAnalyticsError("event_view",unavailable,{kind:"management",id:initialEvent.id});
+  useAnalyticsView("event_viewed",{kind:"management",id:initialEvent.id},{view_mode:"management"},!unavailable);
   const refreshing = useRef(false);
   const refreshedAt = useRef(0);
   async function refresh() {

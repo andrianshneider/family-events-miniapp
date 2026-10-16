@@ -154,7 +154,7 @@ it("exercises actual reservation handlers, permissions, ownership, receipts, ref
     ).toHaveLength(1);
     expect(
       await q`SELECT id FROM app.analytics_events WHERE name='gift_reserved'`,
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     const refresh = (await (await GET(req(), cp)).json()).data;
     expect(refresh.reservations).toEqual([r]);
     expect(refresh.defaultName).toBe("Anna");

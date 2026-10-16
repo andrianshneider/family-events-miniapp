@@ -1,3 +1,5 @@
+import {AnalyticsProvider} from "@/components/analytics-provider";
+import {enabled} from "@/server/analytics/journal";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
@@ -35,7 +37,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
-        <PwaProvider>{children}</PwaProvider>
+        <AnalyticsProvider enabled={enabled()}><PwaProvider>{children}</PwaProvider></AnalyticsProvider>
       </body>
     </html>
   );

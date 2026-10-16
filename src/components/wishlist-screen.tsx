@@ -1,4 +1,5 @@
 "use client";
+import {useAnalyticsError,useAnalyticsView} from "@/lib/analytics/client";
 import { wishlistText } from "@/lib/wishlist-copy";
 
 import { useEffect, useRef, useState } from "react";
@@ -48,6 +49,8 @@ export function WishlistScreen({
     [deleteConflict, setDeleteConflict] = useState(false),
     [formUncertain, setFormUncertain] = useState(false);
   const screen = useRef<HTMLElement>(null);
+  useAnalyticsError("wishlist_view",unavailable||!!error&&!data,{kind:owner?"management":"public",id:eventKey});
+  const analyticsPreview=useAnalyticsView("wishlist_viewed",{kind:owner?"management":"public",id:eventKey},{surface:owner?"management":preview?"preview":"full",is_empty:data?.total===0},!!data&&!unavailable,preview);
   const dialog = useRef<HTMLDialogElement>(null),
     origin = useRef<HTMLElement | null>(null),
     locking = useRef(false);
@@ -357,7 +360,7 @@ export function WishlistScreen({
     </>
   );
   if (preview)
-    return <section className="panel wishlist-preview">{content}</section>;
+    return <section ref={analyticsPreview} className="panel wishlist-preview">{content}</section>;
   return (
     <main ref={screen} className="shell event-shell wishlist-shell">
       <TelegramBack

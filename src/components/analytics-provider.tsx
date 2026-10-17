@@ -8,6 +8,27 @@ import {
   capture,
   navigation,
 } from "@/lib/analytics/client";
+type AnalyticsContext = {
+  data: { reset?: boolean; consent?: boolean; choice?: string };
+};
+let loadingContext: Promise<AnalyticsContext> | null = null;
+function loadContext() {
+  // Share an in-flight bootstrap across navigation/Strict Mode, so a fresh
+  // browser receives one anonymous identity before any client captures start.
+  return (loadingContext ??= fetch("/api/analytics/context", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ platform: clientPlatform() }),
+    cache: "no-store",
+  })
+    .then((response) => {
+      if (!response.ok) throw Error("Analytics context unavailable");
+      return response.json() as Promise<AnalyticsContext>;
+    })
+    .finally(() => {
+      loadingContext = null;
+    }));
+}
 export function AnalyticsProvider({
   enabled,
   children,
@@ -22,21 +43,18 @@ export function AnalyticsProvider({
   useEffect(() => {
     if (!enabled) return;
     navigation();
-    void fetch("/api/analytics/context", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ platform: clientPlatform() }),
-      cache: "no-store",
-    })
-      .then((r) => r.json())
+    let current = true;
+    void loadContext()
       .then(({ data }) => {
+        if (!current) return;
         if (data.reset) resetClientAnalytics();
         analyticsPermission(data.consent === true);
-        setConsent(
-          data.choice === "denied" ? false : data.consent ? true : null,
-        );
+        setConsent(data.choice === "denied" ? false : data.consent === true);
       })
       .catch(() => {});
+    return () => {
+      current = false;
+    };
   }, [enabled, path]);
   useEffect(() => {
     if (!consent) return;
@@ -99,45 +117,26 @@ export function AnalyticsProvider({
       setBusy(false);
     }
   }
-  if (!enabled) return children;
+  if (!enabled || consent === null) return children;
   return (
     <>
       {children}
-      <aside className="analytics-consent" aria-label="Настройки аналитики">
-        {consent === null ? (
-          <>
-            <p>
-              Разрешить аналитику использования? Она помогает улучшать Family
-              Events. Имена, тексты, адреса и записи экрана не отправляются.
-            </p>
-            <button
-              className="secondary"
-              disabled={busy}
-              onClick={() => void choose(false)}
-            >
-              Не разрешать
-            </button>{" "}
-            <button
-              className="secondary"
-              disabled={busy}
-              onClick={() => void choose(true)}
-            >
-              Разрешить
-            </button>
-          </>
-        ) : (
-          <details>
-            <summary>Аналитика: {consent ? "разрешена" : "выключена"}</summary>
-            <button
-              className="secondary"
-              disabled={busy}
-              onClick={() => void choose(!consent)}
-            >
-              {consent ? "Отозвать согласие" : "Разрешить аналитику"}
-            </button>
-          </details>
-        )}
-        {error && <p role="alert">{error}</p>}
+      <aside className="analytics-settings" aria-label="Настройки аналитики">
+        <details>
+          <summary>Настройки аналитики</summary>
+          <p>
+            Аналитика {consent ? "включена" : "выключена"}. Имена, тексты,
+            адреса и записи экрана не отправляются.
+          </p>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => void choose(!consent)}
+          >
+            {consent ? "Отключить аналитику" : "Включить аналитику"}
+          </button>
+          {error && <p role="alert">{error}</p>}
+        </details>
       </aside>
     </>
   );

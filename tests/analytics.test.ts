@@ -26,6 +26,7 @@ import {
   resetAnalytics,
   linkedGuest,
 } from "@/server/analytics/identity";
+import { defaultVisitor } from "@/server/analytics/defaults";
 import { safePayload, drain } from "@/server/analytics/exporter";
 import { createEvent } from "@/server/services/events";
 import { tokenHash } from "@/server/auth/crypto";
@@ -120,6 +121,50 @@ it("enforces consent, same actor/event, savepoint fail-open, committed dedup, fi
     await pg.exec("SET ROLE fe_server");
     const [owner, u1, u2] =
       await query`INSERT INTO app.users(telegram_user_id,display_name) VALUES(1,'canary owner'),(2,'canary U1'),(3,'canary U2') RETURNING id`;
+    // Default-on does not create a Guest Session or override any stored refusal.
+    b.cookies.clear();
+    let automatic: string | undefined;
+    await tx(async (t) => {
+      automatic = await defaultVisitor(t, {}, "web");
+    });
+    expect(automatic).toMatch(/^[\w-]{43}$/);
+    expect(await query`SELECT id FROM app.guest_identities`).toHaveLength(0);
+    b.cookies.set("__Host-fe_analytics", automatic!);
+    await tx(async (t) => {
+      expect(await defaultVisitor(t, {})).toBeUndefined();
+    });
+    await query`UPDATE app.analytics_visitors SET consent=false,revoked_at=now() WHERE token_hash=${tokenHash(automatic!)}`;
+    await tx(async (t) => {
+      expect(await defaultVisitor(t, {})).toBeUndefined();
+    });
+    b.cookies.clear();
+    b.cookies.set("__Host-fe_analytics_choice", "denied");
+    await tx(async (t) => {
+      expect(await defaultVisitor(t, {})).toBeUndefined();
+    });
+    b.cookies.clear();
+    await query`UPDATE app.users SET analytics_denied_at=now() WHERE id=${u1.id}`;
+    await tx(async (t) => {
+      expect(await defaultVisitor(t, { userId: u1.id })).toBeUndefined();
+    });
+    await query`UPDATE app.users SET analytics_denied_at=NULL WHERE id=${u1.id}`;
+    b.cookies.set("__Host-fe_analytics_reset", "1");
+    let afterReset: string | undefined;
+    await tx(async (t) => {
+      afterReset = await defaultVisitor(t, {}, "pwa");
+    });
+    expect(
+      (
+        await query`SELECT suppress_guest_identification FROM app.analytics_visitors WHERE token_hash=${tokenHash(afterReset!)}`
+      )[0],
+    ).toMatchObject({ suppress_guest_identification: true });
+    b.cookies.clear();
+    process.env.APP_ENV = "production";
+    await tx(async (t) => {
+      expect(await defaultVisitor(t, {})).toBeUndefined();
+    });
+    process.env.APP_ENV = "local";
+    await query`DELETE FROM app.analytics_visitors`;
     const [e] =
       await query`INSERT INTO app.events(organizer_id,public_id,title,event_type,event_date,timezone,effective_at) VALUES(${owner.id},'abcdefghijklmnopqrstuv','canary address/title','family','2030-01-01','UTC','2030-01-01T00:00:00Z') RETURNING id`;
     await tx((t) =>

@@ -240,12 +240,31 @@ async function capture(
 }
 try {
   await remember();
-  phase = "deployed analytics context and denied-by-default";
-  const empty = await data(
-    await request("/api/analytics/context", "", "POST", {}),
-  );
+  phase = "deployed default-on analytics context";
+  const initial = await request("/api/analytics/context", "", "POST", {});
+  const empty = await data(initial);
   assert.equal(empty.enabled, true);
-  assert.equal(empty.consent, false);
+  assert.equal(empty.consent, true);
+  assert.equal(empty.choice, "default");
+  const automaticCookie = initial.headers
+    .getSetCookie()
+    .find((v) => v.startsWith("__Host-fe_analytics="))!
+    .split(";")[0];
+  const { createHash } = await import("node:crypto");
+  const [automaticVisitor] =
+    await sql`SELECT consent_group FROM app.analytics_visitors WHERE token_hash=${createHash("sha256").update(automaticCookie.split("=")[1]).digest()}`;
+  analyticsGroups.add(automaticVisitor.consent_group);
+  await remember();
+  const optOut = await consent({ cookie: automaticCookie }, false);
+  const deniedContext = await data(
+    await request(
+      "/api/analytics/context",
+      optOut.cookie + "; __Host-fe_analytics_choice=denied",
+      "POST",
+      {},
+    ),
+  );
+  assert.equal(deniedContext.consent, false);
   let owner = await login(tids[0]);
   await sql`INSERT INTO app.analytics_traffic(user_id,classification) VALUES(${owner.id},'synthetic')`;
   const denied = await request(
@@ -479,7 +498,7 @@ try {
     0,
   );
   console.info(
-    "PASS: staging opt-in default/withdrawal; committed create/RSVP/reservation dedup; same anonymous actor and internal Event UUID; first-touch; no SSR/poll/crawler facts or Guest bootstrap; privacy canaries and forged-source rejection. HTTP collector fixtures only; no real PostHog delivery or physical UI claim.",
+    "PASS: staging default-on bootstrap/explicit withdrawal; committed create/RSVP/reservation dedup; same anonymous actor and internal Event UUID; first-touch; no SSR/poll/crawler facts or Guest bootstrap; privacy canaries and forged-source rejection. HTTP collector fixtures only; no real PostHog delivery or physical UI claim.",
   );
 } catch (error) {
   const n =

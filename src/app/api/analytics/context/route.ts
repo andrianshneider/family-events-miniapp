@@ -1,3 +1,6 @@
+import { defaultVisitor } from "@/server/analytics/defaults";
+import { sessionCookie } from "@/server/auth/sessions";
+import { ANALYTICS_COOKIE } from "@/server/analytics/journal";
 import { resetAnalytics, analyticsCookie } from "@/server/analytics/identity";
 import { principals } from "@/server/analytics/context";
 import { visitor } from "@/server/analytics/journal";
@@ -23,6 +26,22 @@ export const POST = endpoint(async (req, id) => {
     1024,
   );
   if (!enabled()) return reply({ enabled: false, consent: false }, id);
+  const p = await principals();
+  const fresh = await transaction((tx) => defaultVisitor(tx, p, data.platform));
+  if (fresh) {
+    const response = reply(
+      { enabled: true, consent: true, choice: "default" },
+      id,
+    );
+    sessionCookie(response, ANALYTICS_COOKIE, fresh, 180 * 86400);
+    sessionCookie(
+      response,
+      "__Host-fe_analytics_choice",
+      "default",
+      180 * 86400,
+    );
+    return response;
+  }
   const reset = await transaction(async (tx) => {
     const v = await visitor(tx);
     if (v?.had_organizer_session && !(await principals()).userId)

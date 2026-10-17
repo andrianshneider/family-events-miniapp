@@ -66,6 +66,7 @@ it("rejects PII, invented events and unsafe internal identifiers before export",
     outcome: "cancelled",
     $process_person_profile: false,
     $geoip_disable: true,
+    $ip: "0.0.0.0",
   });
 });
 it("enforces consent, same actor/event, savepoint fail-open, committed dedup, first touch, verified links, mixed-account resets and leased delivery", async () => {
@@ -402,6 +403,7 @@ it("uses the pinned actual SDK with stable UUID/insert ID and no browser default
         entry_point: "direct",
         $process_person_profile: false,
         $geoip_disable: true,
+        $ip: "0.0.0.0",
       },
       disableGeoip: true,
     });
@@ -417,6 +419,7 @@ it("uses the pinned actual SDK with stable UUID/insert ID and no browser default
     ])
       expect(captured[0]).not.toContain(forbidden);
     expect(captured[0]).toContain('"$geoip_disable":true');
+    expect(captured[0]).toContain('"$ip":"0.0.0.0"');
   } finally {
     await sdk.shutdown();
   }

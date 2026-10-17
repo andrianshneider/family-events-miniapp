@@ -42,7 +42,12 @@ export function safePayload(name: string, p: Record<string, unknown>) {
       })
       .strict()
       .parse(p);
-    return { ...control, $process_person_profile: true, $geoip_disable: true };
+    return {
+      ...control,
+      $process_person_profile: true,
+      $geoip_disable: true,
+      $ip: "0.0.0.0",
+    };
   }
   if (!(name in specs)) throw Error("LEGACY_EVENT");
   const shape = specs[name as EventName].shape;
@@ -53,7 +58,13 @@ export function safePayload(name: string, p: Record<string, unknown>) {
   );
   const clean = properties(name as EventName, semantic);
   const result = { ...clean, ...envelope.parse(p) };
-  return { ...result, $process_person_profile: false, $geoip_disable: true };
+  // Ingestion otherwise adds the SDK server egress IP despite disabled GeoIP.
+  return {
+    ...result,
+    $process_person_profile: false,
+    $geoip_disable: true,
+    $ip: "0.0.0.0",
+  };
 }
 export async function drain(
   send?: (row: {

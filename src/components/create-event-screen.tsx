@@ -562,7 +562,7 @@ export function CreateEventScreen({
       >
         {editing ? "← Моё событие" : "← Мои события"}
       </button>
-      <div className={editing ? undefined : "create-heading-row"}>
+      <div className="create-heading-row">
         <div>
           <h1 ref={heading} tabIndex={-1}>
             {editing ? "Редактировать событие" : "Создать событие"}
@@ -575,7 +575,7 @@ export function CreateEventScreen({
             Обязательно только название, тип и дата.
           </p>
         </div>
-        {!editing && (
+        {
           <div className="create-heading-cover">
             <label
               className={`create-cover-picker${locked || uploading || !online || !ready ? " is-disabled" : ""}`}
@@ -626,9 +626,9 @@ export function CreateEventScreen({
               </button>
             )}
           </div>
-        )}
+        }
       </div>
-      {!editing && (
+      {
         <>
           {coverError && (
             <p role="alert" className="error">
@@ -641,7 +641,7 @@ export function CreateEventScreen({
             </p>
           ) : null}
         </>
-      )}
+      }
       {!online && (
         <p role="status" className="notice">
           Нет соединения. Можно продолжать заполнять форму; отправка станет
@@ -697,66 +697,6 @@ export function CreateEventScreen({
           {groups.map((group, index) => (
             <section className="panel" key={group.title}>
               <h2>{group.title}</h2>
-              {index === 0 && editing && (
-                <>
-                  <div
-                    className={`event-cover${editing ? "" : " portrait-cover"}`}
-                  >
-                    {cover ? (
-                      <Image
-                        unoptimized
-                        width={800}
-                        height={480}
-                        src={cover}
-                        alt="Предпросмотр обложки события"
-                      />
-                    ) : (
-                      <span aria-hidden="true">♡</span>
-                    )}
-                  </div>
-                  <div className="cover-actions">
-                    <label className="secondary upload-label">
-                      {uploading
-                        ? "Подготавливаем…"
-                        : cover
-                          ? "Сменить обложку"
-                          : "＋ Добавить обложку"}
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        disabled={locked || uploading || !online || !ready}
-                        onChange={(event) => {
-                          void upload(event.target.files?.[0]);
-                          event.target.value = "";
-                        }}
-                      />
-                    </label>
-                    {cover && (
-                      <button
-                        type="button"
-                        className="text-button"
-                        disabled={locked || uploading}
-                        onClick={() => {
-                          setCoverError("");
-                          change("coverAssetId", "");
-                        }}
-                      >
-                        Удалить
-                      </button>
-                    )}
-                  </div>
-                  {coverError && (
-                    <p role="alert" className="error">
-                      {coverError}
-                    </p>
-                  )}
-                  {fieldErrors.coverAssetId?.length ? (
-                    <p role="alert" className="error">
-                      {fieldErrors.coverAssetId[0]}
-                    </p>
-                  ) : null}
-                </>
-              )}
               {group.fields.map((field) => (
                 <div className="field" key={field.key}>
                   <div className="label-row">
@@ -853,7 +793,7 @@ export function CreateEventScreen({
         </div>
         <aside className="panel event-preview">
           <h2>Так увидят гости</h2>
-          <div className={`event-cover${editing ? "" : " portrait-cover"}`}>
+          <div className="event-cover portrait-cover">
             {cover ? (
               <Image unoptimized width={800} height={480} src={cover} alt="" />
             ) : (

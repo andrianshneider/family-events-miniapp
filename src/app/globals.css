@@ -858,3 +858,51 @@ a:focus-visible {
 html:has(.events-screen) {
   overscroll-behavior-y: contain;
 }
+
+/* Portrait cover in Create Event; existing edit/detail layouts stay unchanged. */
+.event-cover.portrait-cover {
+  width: min(100%, 300px);
+  height: auto;
+  aspect-ratio: 3 / 4;
+  position: relative;
+  margin-inline: auto;
+}
+.event-cover.portrait-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.create-heading-row { display:grid; grid-template-columns:minmax(0,1fr) 96px; gap:16px; align-items:start; margin:16px 0 0; }
+.create-heading-row h1 { margin-top:0; }
+.create-cover-picker { display:grid; place-items:center; width:100%; aspect-ratio:3 / 4; position:relative; overflow:hidden; border:1px solid #e6dfe9; border-radius:14px; background:#eee5fa; color:#7952c7; font-size:32px; cursor:pointer; }
+.create-cover-picker img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.create-cover-picker input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
+.create-cover-picker:focus-within { outline:3px solid #7952c7; outline-offset:3px; }
+.create-cover-picker.is-disabled { opacity:.6; cursor:wait; }
+.create-heading-cover .hint { font-size:11px; line-height:16px; margin:6px 0 0; }
+.create-heading-cover .text-button { min-height:44px; padding:8px 0; font-size:12px; }
+@media(min-width:768px) { .create-heading-row { grid-template-columns:minmax(0,1fr) 120px; gap:24px; } }
+
+#create-event .label-row { flex-wrap:wrap; gap:4px 8px; align-items:baseline; }
+#create-event .label-row label, #create-event .label-row > .hint { flex-shrink:0; }
+#create-event .hint:empty { display:none; }
+#create-event select { appearance:none; padding-right:42px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%23716879' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position:right 16px center; background-size:16px; background-repeat:no-repeat; }
+
+.time-picker-trigger { width:100%; min-height:50px; border:1px solid #e6dfe9; border-radius:12px; background:white; color:#302b3a; padding:12px; display:flex; justify-content:space-between; align-items:center; font-size:16px; }
+.time-picker-trigger[data-invalid=true] { border-color:#a32d45; }
+.time-picker-dialog { width:min(340px,calc(100vw - 32px)); padding:24px; border:1px solid #e6dfe9; border-radius:22px; background:white; color:#302b3a; }
+.time-picker-dialog::backdrop { background:#29243366; }
+.time-wheels { display:flex; justify-content:center; gap:16px; align-items:center; margin:20px 0; }
+.time-wheel-column { width:100px; text-align:center; }
+.time-wheel-caption { font-size:12px; color:#716879; margin-bottom:8px; }
+.time-wheel { height:220px; overflow-y:auto; overscroll-behavior:contain; scroll-snap-type:y mandatory; padding:88px 0; scrollbar-width:none; background:linear-gradient(to bottom,transparent 88px,#f5efff 88px,#f5efff 132px,transparent 132px); border-radius:12px; }
+.time-wheel::-webkit-scrollbar { display:none; }
+.time-wheel-option { height:44px; line-height:44px; scroll-snap-align:center; font-size:24px; color:#8b8493; cursor:pointer; }
+.time-wheel-option.selected { color:#302b3a; font-weight:600; }
+.time-wheel-colon { font-size:24px; padding-top:24px; }
+.time-picker-actions { display:flex; gap:12px; }
+.time-picker-dialog .time-picker-actions button { width:50%; margin:0; min-height:48px; }
+.time-picker-dialog .time-picker-clear { width:100%; min-height:44px; margin-top:12px; }

@@ -1,8 +1,9 @@
 "use client";
-import {capture,failure,telemetryHeaders} from "@/lib/analytics/client";
+import { capture, failure, telemetryHeaders } from "@/lib/analytics/client";
 import { announceEventChange, watchEventChanges } from "@/lib/event-updates";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { TimePicker } from "./time-picker";
 import { useRouter } from "next/navigation";
 import { eventInput } from "@/lib/validation";
 import {
@@ -40,7 +41,6 @@ const groups: {
         label: "Название",
         max: 80,
         required: true,
-        hint: "От 3 до 80 символов",
       },
       {
         key: "eventType",
@@ -126,7 +126,7 @@ export function CreateEventScreen({
   const [coverError, setCoverError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const form = useRef<HTMLFormElement>(null);
-  const analyticsForm=useRef<string|null>(null);
+  const analyticsForm = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelSource = useRef<HTMLElement | null>(null);
@@ -268,7 +268,12 @@ export function CreateEventScreen({
     return () => window.removeEventListener("beforeunload", before);
   }, [dirty]);
   function change(key: keyof Fields, value: string) {
-    if(!editing&&!analyticsForm.current){analyticsForm.current=crypto.randomUUID();void capture("event_creation_started",{form_instance_id:analyticsForm.current});}
+    if (!editing && !analyticsForm.current) {
+      analyticsForm.current = crypto.randomUUID();
+      void capture("event_creation_started", {
+        form_instance_id: analyticsForm.current,
+      });
+    }
     const next = { ...fieldsRef.current, [key]: value };
     fieldsRef.current = next;
     setFields(next);
@@ -388,7 +393,7 @@ export function CreateEventScreen({
     setError("");
     setFieldErrors({});
     let current = attempt;
-    let analyticsFailed=false;
+    let analyticsFailed = false;
     if (!current) {
       const payload = {
         ...fields,
@@ -398,7 +403,10 @@ export function CreateEventScreen({
       };
       const parsed = eventInput.safeParse(payload);
       if (!parsed.success) {
-        if(!editing)failure("event_create",crypto.randomUUID(),undefined,{code:"VALIDATION_ERROR"});
+        if (!editing)
+          failure("event_create", crypto.randomUUID(), undefined, {
+            code: "VALIDATION_ERROR",
+          });
         const errors: Record<string, string[]> = {};
         for (const issue of parsed.error.issues) {
           const key = String(issue.path[0]);
@@ -437,7 +445,10 @@ export function CreateEventScreen({
             "Content-Type": "application/json",
             "x-csrf-token": csrf,
             "idempotency-key": current.key,
-            ...telemetryHeaders(current.key,analyticsForm.current??undefined),
+            ...telemetryHeaders(
+              current.key,
+              analyticsForm.current ?? undefined,
+            ),
           },
           body: JSON.stringify(
             editing
@@ -455,7 +466,12 @@ export function CreateEventScreen({
         },
       );
       const result = await response.json();
-      if(!response.ok&&!editing){analyticsFailed=true;failure("event_create",current.key,undefined,{code:result.error?.code});}
+      if (!response.ok && !editing) {
+        analyticsFailed = true;
+        failure("event_create", current.key, undefined, {
+          code: result.error?.code,
+        });
+      }
       if (response.status === 401) {
         persist(fields, current);
         allowExit.current = true;
@@ -504,7 +520,13 @@ export function CreateEventScreen({
           : `/events/${result.data.id}?${editing ? "updated" : "created"}=1`,
       );
     } catch (caught) {
-      if(!editing&&!analyticsFailed)failure("event_create",current?.key??crypto.randomUUID(),undefined,caught);
+      if (!editing && !analyticsFailed)
+        failure(
+          "event_create",
+          current?.key ?? crypto.randomUUID(),
+          undefined,
+          caught,
+        );
       setError(
         caught instanceof Error && caught.name === "Error"
           ? caught.message
@@ -540,16 +562,86 @@ export function CreateEventScreen({
       >
         {editing ? "← Моё событие" : "← Мои события"}
       </button>
-      <h1 ref={heading} tabIndex={-1}>
-        {editing ? "Редактировать событие" : "Создать событие"}
-      </h1>
-      <p className="muted">
-        {editing
-          ? "Измените сведения и сохраните результат."
-          : "Соберите близких в один день."}
-        <br />
-        Обязательно только название, тип и дата.
-      </p>
+      <div className={editing ? undefined : "create-heading-row"}>
+        <div>
+          <h1 ref={heading} tabIndex={-1}>
+            {editing ? "Редактировать событие" : "Создать событие"}
+          </h1>
+          <p className="muted">
+            {editing
+              ? "Измените сведения и сохраните результат."
+              : "Соберите близких в один день."}
+            <br />
+            Обязательно только название, тип и дата.
+          </p>
+        </div>
+        {!editing && (
+          <div className="create-heading-cover">
+            <label
+              className={`create-cover-picker${locked || uploading || !online || !ready ? " is-disabled" : ""}`}
+            >
+              {cover ? (
+                <Image
+                  unoptimized
+                  width={300}
+                  height={400}
+                  src={cover}
+                  alt="Обложка события"
+                />
+              ) : (
+                <span aria-hidden="true">＋</span>
+              )}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                aria-label={
+                  cover ? "Сменить обложку события" : "Добавить обложку события"
+                }
+                aria-describedby="create-cover-hint"
+                disabled={locked || uploading || !online || !ready}
+                onChange={(event) => {
+                  void upload(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </label>
+            <p className="hint" id="create-cover-hint">
+              {uploading
+                ? "Подготавливаем…"
+                : cover
+                  ? "Нажмите, чтобы сменить"
+                  : "Добавить обложку"}
+            </p>
+            {cover && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={locked || uploading}
+                onClick={() => {
+                  setCoverError("");
+                  change("coverAssetId", "");
+                }}
+              >
+                Удалить
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      {!editing && (
+        <>
+          {coverError && (
+            <p role="alert" className="error">
+              {coverError}
+            </p>
+          )}
+          {fieldErrors.coverAssetId?.length ? (
+            <p role="alert" className="error">
+              {fieldErrors.coverAssetId[0]}
+            </p>
+          ) : null}
+        </>
+      )}
       {!online && (
         <p role="status" className="notice">
           Нет соединения. Можно продолжать заполнять форму; отправка станет
@@ -605,9 +697,11 @@ export function CreateEventScreen({
           {groups.map((group, index) => (
             <section className="panel" key={group.title}>
               <h2>{group.title}</h2>
-              {index === 0 && (
+              {index === 0 && editing && (
                 <>
-                  <div className="event-cover">
+                  <div
+                    className={`event-cover${editing ? "" : " portrait-cover"}`}
+                  >
                     {cover ? (
                       <Image
                         unoptimized
@@ -651,9 +745,6 @@ export function CreateEventScreen({
                       </button>
                     )}
                   </div>
-                  <p className="hint">
-                    Необязательно · JPG, PNG или WebP, до 10 Мб
-                  </p>
                   {coverError && (
                     <p role="alert" className="error">
                       {coverError}
@@ -673,7 +764,7 @@ export function CreateEventScreen({
                       {field.label}
                       {field.required ? " *" : ""}
                     </label>
-                    <span className="hint">
+                    <span className="hint" hidden={field.type === "time"}>
                       {field.max
                         ? `${fields[field.key].length} / ${field.max}`
                         : field.required
@@ -701,6 +792,16 @@ export function CreateEventScreen({
                         </option>
                       ))}
                     </select>
+                  ) : field.type === "time" ? (
+                    <TimePicker
+                      id={field.key}
+                      label={field.label}
+                      value={fields[field.key]}
+                      onChange={(value) => change(field.key, value)}
+                      disabled={locked || !ready}
+                      invalid={!!fieldErrors[field.key]?.length}
+                      describedBy={`${field.key}-hint ${field.key}-error`}
+                    />
                   ) : field.type === "textarea" ? (
                     <textarea
                       id={field.key}
@@ -752,7 +853,7 @@ export function CreateEventScreen({
         </div>
         <aside className="panel event-preview">
           <h2>Так увидят гости</h2>
-          <div className="event-cover">
+          <div className={`event-cover${editing ? "" : " portrait-cover"}`}>
             {cover ? (
               <Image unoptimized width={800} height={480} src={cover} alt="" />
             ) : (

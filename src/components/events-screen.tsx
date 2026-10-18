@@ -1,5 +1,5 @@
 "use client";
-import {resetClientAnalytics} from "@/lib/analytics/client";
+import { resetClientAnalytics } from "@/lib/analytics/client";
 import { watchEventChanges } from "@/lib/event-updates";
 import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState, useRef } from "react";
@@ -40,6 +40,8 @@ export function EventsScreen({
   });
   const flight = useRef<Promise<void> | null>(null);
   const lastRefresh = useRef(0);
+  const screen = useRef<HTMLElement>(null);
+  const [pullDistance, setPullDistance] = useState(0);
 
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -97,6 +99,67 @@ export function EventsScreen({
     flight.current = work;
     return work;
   }, []);
+  useEffect(() => {
+    const element = screen.current;
+    if (!element) return;
+    let start: { x: number; y: number } | null = null;
+    let distance = 0;
+    const atTop = () => window.scrollY <= 0;
+    const reset = () => {
+      start = null;
+      distance = 0;
+      setPullDistance(0);
+    };
+    const begin = (event: TouchEvent) => {
+      if (
+        pending ||
+        loadingMore ||
+        loggingOut ||
+        !atTop() ||
+        event.touches.length !== 1 ||
+        (event.target instanceof Element &&
+          event.target.closest("button,a,input,textarea,select,[role=dialog]"))
+      )
+        return;
+      start = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+    };
+    const move = (event: TouchEvent) => {
+      if (!start) return;
+      if (event.touches.length !== 1 || !atTop()) {
+        reset();
+        return;
+      }
+      const dx = Math.abs(event.touches[0].clientX - start.x);
+      const dy = event.touches[0].clientY - start.y;
+      if (dy <= 0 || dx > Math.max(12, dy)) {
+        reset();
+        return;
+      }
+      if (dy < 8) return;
+      if (event.cancelable) event.preventDefault();
+      distance = Math.min(dy * 0.5, 100);
+      setPullDistance(distance);
+    };
+    const finish = () => {
+      const refresh = distance >= 64;
+      reset();
+      if (refresh && !flight.current) {
+        setError("");
+        setMoreError("");
+        void load();
+      }
+    };
+    element.addEventListener("touchstart", begin, { passive: true });
+    element.addEventListener("touchmove", move, { passive: false });
+    element.addEventListener("touchend", finish);
+    element.addEventListener("touchcancel", reset);
+    return () => {
+      element.removeEventListener("touchstart", begin);
+      element.removeEventListener("touchmove", move);
+      element.removeEventListener("touchend", finish);
+      element.removeEventListener("touchcancel", reset);
+    };
+  }, [load, pending, loadingMore, loggingOut]);
   async function loadMore() {
     if (!data?.nextCursor || loadingMore) return;
     setLoadingMore(true);
@@ -202,7 +265,18 @@ export function EventsScreen({
     }
   }
   return (
-    <main className="shell">
+    <main className="shell events-screen" ref={screen}>
+      <div
+        className="pull-refresh-indicator"
+        style={{ height: pullDistance }}
+        aria-hidden="true"
+      >
+        {pullDistance >= 64
+          ? "Отпустите, чтобы обновить"
+          : pullDistance > 0
+            ? "Потяните вниз для обновления"
+            : ""}
+      </div>
       <header className="top">
         <div className="brand">
           <span aria-hidden="true">♡</span> Family Events
@@ -300,25 +374,8 @@ export function EventsScreen({
             <p className="muted">
               Здесь появятся ваши семейные праздники и встречи.
             </p>
-            <Link href="/events/new" className="secondary">
-              Создать первое событие
-            </Link>
           </section>
         ))}
-      {data && (
-        <button
-          className="secondary refresh"
-          disabled={loadingMore || pending}
-          onClick={() => {
-            setPending(true);
-            setError("");
-            setMoreError("");
-            void load();
-          }}
-        >
-          Обновить список
-        </button>
-      )}
       <InstallHelp />
     </main>
   );

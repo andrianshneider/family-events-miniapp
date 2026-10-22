@@ -976,3 +976,10 @@ html:has(.events-screen) {
 .organizer-card a:focus-visible { outline:3px solid #7952c7; outline-offset:2px; }
 @media(max-width:360px) { .organizer-card-summary.with-cover { gap:12px; } .organizer-card-copy h2 { font-size:18px; } .organizer-card-row { font-size:13px; } .organizer-card-actions a { font-size:12px; gap:4px; } .organizer-card-badge { font-size:11px; left:4px; right:4px; } }
 .event-list > li:has(.organizer-card) { margin:20px 0; }
+.organizer-card-copy h1 { font-size:21px; line-height:1.25; margin:0 0 10px; }
+.organizer-card-type { font-size:13px; color:#756e7e; margin:6px 0; line-height:1.4; }
+.organizer-card-zone { font-size:12px; color:#756e7e; margin:8px 0; line-height:1.4; }
+.organizer-card-actions button { display:flex; align-items:center; justify-content:center; gap:7px; padding:10px 4px; min-height:52px; border:1px solid #e6dfe9; border-radius:14px; color:#7952c7; background:white; font-size:13px; }
+.event-management-information { min-width:0; }
+.event-extra-details { margin-top:16px; }
+@media(max-width:360px) { .organizer-card-copy h1 { font-size:18px; } .organizer-card-actions button { font-size:12px; gap:4px; } }

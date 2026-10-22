@@ -1,7 +1,8 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type Ref } from "react";
+import { eventTypes } from "./event-presentation";
 import type { EventList } from "@/server/services/event-list";
 function Icon({
   kind,
@@ -41,8 +42,15 @@ function Icon({
 }
 export function OrganizerEventCard({
   event: e,
+  detail,
+  headingRef,
 }: {
   event: EventList["events"][number];
+  headingRef?: Ref<HTMLHeadingElement>;
+  detail?: {
+    refresh: () => void;
+    pending: boolean;
+  };
 }) {
   const [badge, setBadge] = useState("");
   useEffect(() => {
@@ -72,53 +80,74 @@ export function OrganizerEventCard({
     const timer = setInterval(update, 60000);
     return () => clearInterval(timer);
   }, [e.eventDate, e.timezone]);
+  const summary = (
+    <>
+      {e.coverUrl && (
+        <div className="organizer-card-cover">
+          <Image
+            unoptimized
+            width={300}
+            height={400}
+            src={e.coverUrl}
+            alt={`Обложка события «${e.title}»`}
+          />
+          {badge && <span className="organizer-card-badge">{badge}</span>}
+        </div>
+      )}
+      <div className="organizer-card-copy">
+        {detail ? (
+          <h1 ref={headingRef} tabIndex={-1}>
+            {e.title}
+          </h1>
+        ) : (
+          <h2>{e.title}</h2>
+        )}
+        {detail && (
+          <p className="organizer-card-type">
+            {eventTypes[e.eventType as keyof typeof eventTypes]}
+          </p>
+        )}
+        <p className="organizer-card-row">
+          <Icon kind="date" />
+          <span>
+            {new Intl.DateTimeFormat("ru-RU", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+              timeZone: "UTC",
+            }).format(new Date(e.eventDate + "T12:00:00Z"))}
+            {e.startTime
+              ? ` · ${e.startTime.slice(0, 5)}${e.endTime ? "–" + e.endTime.slice(0, 5) : ""}`
+              : ""}
+          </span>
+        </p>
+        {e.venueName && (
+          <p className="organizer-card-row">
+            <Icon kind="place" />
+            <span>{e.venueName}</span>
+          </p>
+        )}
+        {detail && e.startTime && (
+          <p className="organizer-card-zone">Часовой пояс: {e.timezone}</p>
+        )}
+        <span className="organizer-card-stats">
+          {e.responseCount
+            ? `Ответов гостей: ${e.responseCount}`
+            : "Ответов гостей пока нет"}
+        </span>
+      </div>
+    </>
+  );
+  const summaryClass = `organizer-card-summary${e.coverUrl ? " with-cover" : ""}`;
   return (
     <article className="organizer-card">
-      <Link
-        href={`/events/${e.id}`}
-        className={`organizer-card-summary${e.coverUrl ? " with-cover" : ""}`}
-      >
-        {e.coverUrl && (
-          <div className="organizer-card-cover">
-            <Image
-              unoptimized
-              width={300}
-              height={400}
-              src={e.coverUrl}
-              alt={`Обложка события «${e.title}»`}
-            />
-            {badge && <span className="organizer-card-badge">{badge}</span>}
-          </div>
-        )}
-        <div className="organizer-card-copy">
-          <h2>{e.title}</h2>
-          <p className="organizer-card-row">
-            <Icon kind="date" />
-            <span>
-              {new Intl.DateTimeFormat("ru-RU", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-                timeZone: "UTC",
-              }).format(new Date(e.eventDate + "T12:00:00Z"))}
-              {e.startTime
-                ? ` · ${e.startTime.slice(0, 5)}${e.endTime ? "–" + e.endTime.slice(0, 5) : ""}`
-                : ""}
-            </span>
-          </p>
-          {e.venueName && (
-            <p className="organizer-card-row">
-              <Icon kind="place" />
-              <span>{e.venueName}</span>
-            </p>
-          )}
-          <span className="organizer-card-stats">
-            {e.responseCount
-              ? `Ответов гостей: ${e.responseCount}`
-              : "Ответов гостей пока нет"}
-          </span>
-        </div>
-      </Link>
+      {detail ? (
+        <div className={summaryClass}>{summary}</div>
+      ) : (
+        <Link href={`/events/${e.id}`} className={summaryClass}>
+          {summary}
+        </Link>
+      )}
       <nav
         className="organizer-card-actions"
         aria-label={`Действия: ${e.title}`}
@@ -131,10 +160,21 @@ export function OrganizerEventCard({
           <Icon kind="guests" />
           Гости
         </Link>
-        <Link href={`/events/${e.id}`}>
-          <Icon kind="details" />
-          Детали
-        </Link>
+        {detail ? (
+          <button
+            type="button"
+            onClick={detail.refresh}
+            disabled={detail.pending}
+          >
+            <Icon kind="details" />
+            {detail.pending ? "Обновляем…" : "Обновить"}
+          </button>
+        ) : (
+          <Link href={`/events/${e.id}`}>
+            <Icon kind="details" />
+            Детали
+          </Link>
+        )}
       </nav>
     </article>
   );

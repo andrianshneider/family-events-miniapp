@@ -2,10 +2,9 @@
 import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import Link from "next/link";
 import { watchEventChanges } from "@/lib/event-updates";
-import Image from "next/image";
+import { OrganizerEventCard } from "./organizer-event-card";
 import { useEffect, useRef, useState } from "react";
 import type { organizerEvent } from "@/server/services/events";
-import { eventDateLabel, eventTypes } from "./event-presentation";
 import { GuestCard } from "./guest-card";
 import { EventActions } from "./event-actions";
 import { OrganizerHeader } from "./organizer-header";
@@ -138,55 +137,38 @@ export function EventScreen({
         </div>
       )}
       <div className="event-layout event-detail" aria-busy={pending}>
-        <section className="panel">
-          <div className={`event-summary${event.coverUrl ? " has-cover" : ""}`}>
-            {event.coverUrl && (
-              <div className="event-cover detail-cover">
-                <Image
-                  unoptimized
-                  width={1000}
-                  height={600}
-                  src={event.coverUrl}
-                  alt={`Обложка события «${event.title}»`}
-                />
-              </div>
-            )}
-            <div className="event-card-copy">
-              <p className="event-status">
-                {event.isPast ? "Прошедшее событие" : "Предстоящее событие"}
-              </p>
-              <h1 ref={heading} tabIndex={-1}>
-                {event.title}
-              </h1>
-              <p className="muted">
-                {eventTypes[event.eventType as keyof typeof eventTypes]}
-              </p>
-              <p>
-                {eventDateLabel(event.eventDate)}
-                {event.startTime
-                  ? ` · ${event.startTime}${event.endTime ? "–" + event.endTime : ""}`
-                  : ""}
-              </p>
-              <p className="timezone">Часовой пояс: {event.timezone}</p>
+        <section className="event-management-information">
+          <OrganizerEventCard
+            event={{
+              ...event,
+              responseCount:
+                event.responses.yes +
+                event.responses.no +
+                event.responses.maybe,
+            }}
+            headingRef={heading}
+            detail={{ refresh, pending }}
+          />
+          {(event.address ||
+            event.directions ||
+            event.description ||
+            event.dressCode) && (
+            <div className="panel event-extra-details">
+              {[
+                ["Адрес", event.address],
+                ["Как найти", event.directions],
+                ["Описание", event.description],
+                ["Дресс-код", event.dressCode],
+              ].map(([label, value]) =>
+                value ? (
+                  <section className="event-text" key={label}>
+                    <h2>{label}</h2>
+                    <p>{value}</p>
+                  </section>
+                ) : null,
+              )}
             </div>
-          </div>
-          {event.venueName && <h2>{event.venueName}</h2>}
-          {[
-            ["Адрес", event.address],
-            ["Как найти", event.directions],
-            ["Описание", event.description],
-            ["Дресс-код", event.dressCode],
-          ].map(([label, value]) =>
-            value ? (
-              <section className="event-text" key={label}>
-                <h2>{label}</h2>
-                <p>{value}</p>
-              </section>
-            ) : null,
           )}
-          <button className="secondary" onClick={refresh} disabled={pending}>
-            {pending ? "Обновляем…" : "Обновить сведения"}
-          </button>
         </section>
         <aside className="form-panels">
           <section className="panel">

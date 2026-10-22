@@ -4,18 +4,10 @@ import { watchEventChanges } from "@/lib/event-updates";
 import { InstallHelp } from "./install-help";
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { OrganizerEventCard } from "./organizer-event-card";
 import type { EventList } from "@/server/services/event-list";
 import { readEventForm } from "@/lib/event-form-state";
-type EventItem = {
-  id: string;
-  title: string;
-  eventDate: string;
-  startTime: string | null;
-  timezone: string;
-  venueName: string | null;
-  coverUrl: string | null;
-};
+type EventItem = EventList["events"][number];
 type Loaded = {
   name: string;
   events: EventItem[];
@@ -318,41 +310,8 @@ export function EventsScreen({
           <>
             <ul className="event-list">
               {data.events.map((e) => (
-                <li className="card" key={e.id}>
-                  <Link
-                    href={`/events/${e.id}`}
-                    className={`event-card-link${e.coverUrl ? " has-cover" : ""}`}
-                  >
-                    {e.coverUrl && (
-                      <div className="event-cover list-cover">
-                        <Image
-                          unoptimized
-                          width={800}
-                          height={480}
-                          src={e.coverUrl}
-                          alt={`Обложка события «${e.title}»`}
-                        />
-                      </div>
-                    )}
-                    <div className="event-card-copy">
-                      <h2>{e.title}</h2>
-                      <p>
-                        {new Intl.DateTimeFormat("ru-RU", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                          timeZone: "UTC",
-                        }).format(new Date(e.eventDate + "T12:00:00Z"))}
-                        {e.startTime ? " · " + e.startTime.slice(0, 5) : ""}
-                      </p>
-                      {e.startTime && (
-                        <p className="small muted">
-                          Часовой пояс: {e.timezone}
-                        </p>
-                      )}
-                      {e.venueName && <p className="muted">{e.venueName}</p>}
-                    </div>
-                  </Link>
+                <li key={e.id}>
+                  <OrganizerEventCard event={e} />
                 </li>
               ))}
             </ul>

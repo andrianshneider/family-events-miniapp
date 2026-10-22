@@ -959,3 +959,20 @@ html:has(.events-screen) {
 .event-summary.has-cover .event-card-copy h1 {
   margin: 8px 0 12px;
 }
+
+.organizer-card { padding:10px; border:1px solid #e6dfe9; border-radius:24px; background:#fff; overflow:hidden; }
+.organizer-card-summary { display:block; color:inherit; text-decoration:none; border-radius:18px; }
+.organizer-card-summary.with-cover { display:grid; grid-template-columns:30% minmax(0,1fr); gap:16px; align-items:center; }
+.organizer-card-cover { position:relative; aspect-ratio:3/4; border-radius:18px; overflow:hidden; background:#eee5fa; }
+.organizer-card-cover img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.organizer-card-badge { position:absolute; top:8px; left:8px; right:8px; padding:10px 3px; border-radius:12px; background:#fff1f0; color:#b64c48; font-size:12px; font-weight:600; text-align:center; }
+.organizer-card-copy { min-width:0; padding:8px 6px 8px 0; overflow-wrap:anywhere; }
+.organizer-card-copy h2 { font-size:21px; line-height:1.25; margin:0 0 14px; }
+.organizer-card-row { display:flex; gap:8px; align-items:flex-start; color:#756e7e; font-size:14px; line-height:1.45; margin:9px 0; }
+.organizer-card svg { width:18px; height:18px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.organizer-card-stats { display:inline-block; font-size:12px; color:#756e7e; background:#f6f2fc; padding:8px 10px; border-radius:10px; margin-top:6px; }
+.organizer-card-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:12px; }
+.organizer-card-actions a { display:flex; align-items:center; justify-content:center; gap:7px; padding:10px 4px; min-height:52px; border:1px solid #e6dfe9; border-radius:14px; color:#7952c7; background:white; text-decoration:none; font-size:13px; }
+.organizer-card a:focus-visible { outline:3px solid #7952c7; outline-offset:2px; }
+@media(max-width:360px) { .organizer-card-summary.with-cover { gap:12px; } .organizer-card-copy h2 { font-size:18px; } .organizer-card-row { font-size:13px; } .organizer-card-actions a { font-size:12px; gap:4px; } .organizer-card-badge { font-size:11px; left:4px; right:4px; } }
+.event-list > li:has(.organizer-card) { margin:20px 0; }

@@ -15,6 +15,8 @@ it("renders the first real event and profile in server HTML before client effect
             eventDate: "2027-01-01",
             eventType: "family",
             startTime: null,
+            endTime: null,
+            responseCount: 2,
             timezone: "UTC",
             venueName: null,
             coverUrl: null,
@@ -27,6 +29,9 @@ it("renders the first real event and profile in server HTML before client effect
   );
   expect(html).toContain("Server event");
   expect(html).toContain("Organizer");
+  expect(html).toContain("Ответов гостей: 2");
+  expect(html).toContain('href="/events/event/wishlist"');
+  expect(html).toContain('href="/events/event/guests"');
   expect(html).not.toContain("Загружаем события");
   expect(fetch).not.toHaveBeenCalled();
   vi.restoreAllMocks();

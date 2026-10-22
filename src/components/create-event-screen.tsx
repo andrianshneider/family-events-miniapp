@@ -1,4 +1,5 @@
 "use client";
+import { prepareCoverImage } from "@/lib/prepare-cover-image";
 import { capture, failure, telemetryHeaders } from "@/lib/analytics/client";
 import { announceEventChange, watchEventChanges } from "@/lib/event-updates";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -330,17 +331,10 @@ export function CreateEventScreen({
   async function upload(file: File | undefined) {
     if (!file || busy.current || uploadBusy.current || attempt) return;
     setCoverError("");
-    if (
-      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-      file.size > 10485760 ||
-      !file.size
-    ) {
-      setCoverError("Выберите JPG, PNG или WebP до 10 Мб.");
-      return;
-    }
     uploadBusy.current = true;
     setUploading(true);
     try {
+      file = await prepareCoverImage(file);
       const csrf = await csrfToken();
       const prepare = await fetch("/api/v1/media/uploads", {
         method: "POST",

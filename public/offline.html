@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#7e50c5" />
+    <title>Нет подключения — Family Events</title>
+    <style>
+      body {
+        margin: 0;
+        background: #f5f2f8;
+        color: #302b3a;
+        font:
+          18px/1.6 Arial,
+          sans-serif;
+      }
+      main {
+        box-sizing: border-box;
+        max-width: 720px;
+        min-height: 100dvh;
+        margin: auto;
+        background: white;
+        padding: max(32px, env(safe-area-inset-top))
+          max(24px, env(safe-area-inset-right))
+          max(32px, env(safe-area-inset-bottom))
+          max(24px, env(safe-area-inset-left));
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.2;
+        margin-top: 64px;
+      }
+      button {
+        font: inherit;
+        border: 0;
+        border-radius: 16px;
+        padding: 16px 24px;
+        background: #7e50c5;
+        color: white;
+        min-height: 48px;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid #302b3a;
+        outline-offset: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <strong>♡ Family Events</strong>
+      <h1>Нет подключения к интернету</h1>
+      <p>
+        Подключитесь к сети и попробуйте снова. Вернёмся на страницу, которую вы
+        открывали.
+      </p>
+      <button id="retry">Повторить</button>
+    </main>
+    <script>
+      document.getElementById("retry").addEventListener("click", function () {
+        location.reload();
+      });
+      window.addEventListener("online", function () {
+        location.reload();
+      });
+    </script>
+  </body>
+</html>

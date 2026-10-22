@@ -1,5 +1,5 @@
 "use client";
-import {useAnalyticsError,useAnalyticsView} from "@/lib/analytics/client";
+import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import Link from "next/link";
 import { watchEventChanges } from "@/lib/event-updates";
 import Image from "next/image";
@@ -27,8 +27,16 @@ export function EventScreen({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
-  useAnalyticsError("event_view",unavailable,{kind:"management",id:initialEvent.id});
-  useAnalyticsView("event_viewed",{kind:"management",id:initialEvent.id},{view_mode:"management"},!unavailable);
+  useAnalyticsError("event_view", unavailable, {
+    kind: "management",
+    id: initialEvent.id,
+  });
+  useAnalyticsView(
+    "event_viewed",
+    { kind: "management", id: initialEvent.id },
+    { view_mode: "management" },
+    !unavailable,
+  );
   const refreshing = useRef(false);
   const refreshedAt = useRef(0);
   async function refresh() {
@@ -131,33 +139,37 @@ export function EventScreen({
       )}
       <div className="event-layout event-detail" aria-busy={pending}>
         <section className="panel">
-          {event.coverUrl && (
-            <div className="event-cover detail-cover">
-              <Image
-                unoptimized
-                width={1000}
-                height={600}
-                src={event.coverUrl}
-                alt={`Обложка события «${event.title}»`}
-              />
+          <div className={`event-summary${event.coverUrl ? " has-cover" : ""}`}>
+            {event.coverUrl && (
+              <div className="event-cover detail-cover">
+                <Image
+                  unoptimized
+                  width={1000}
+                  height={600}
+                  src={event.coverUrl}
+                  alt={`Обложка события «${event.title}»`}
+                />
+              </div>
+            )}
+            <div className="event-card-copy">
+              <p className="event-status">
+                {event.isPast ? "Прошедшее событие" : "Предстоящее событие"}
+              </p>
+              <h1 ref={heading} tabIndex={-1}>
+                {event.title}
+              </h1>
+              <p className="muted">
+                {eventTypes[event.eventType as keyof typeof eventTypes]}
+              </p>
+              <p>
+                {eventDateLabel(event.eventDate)}
+                {event.startTime
+                  ? ` · ${event.startTime}${event.endTime ? "–" + event.endTime : ""}`
+                  : ""}
+              </p>
+              <p className="timezone">Часовой пояс: {event.timezone}</p>
             </div>
-          )}
-          <p className="event-status">
-            {event.isPast ? "Прошедшее событие" : "Предстоящее событие"}
-          </p>
-          <h1 ref={heading} tabIndex={-1}>
-            {event.title}
-          </h1>
-          <p className="muted">
-            {eventTypes[event.eventType as keyof typeof eventTypes]}
-          </p>
-          <p>
-            {eventDateLabel(event.eventDate)}
-            {event.startTime
-              ? ` · ${event.startTime}${event.endTime ? "–" + event.endTime : ""}`
-              : ""}
-          </p>
-          <p className="timezone">Часовой пояс: {event.timezone}</p>
+          </div>
           {event.venueName && <h2>{event.venueName}</h2>}
           {[
             ["Адрес", event.address],

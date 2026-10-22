@@ -906,3 +906,56 @@ html:has(.events-screen) {
 .time-picker-actions { display:flex; gap:12px; }
 .time-picker-dialog .time-picker-actions button { width:50%; margin:0; min-height:48px; }
 .time-picker-dialog .time-picker-clear { width:100%; min-height:44px; margin-top:12px; }
+
+/* Organizer cards pair portrait covers with their event summary. */
+.event-card-link.has-cover,
+.event-summary.has-cover {
+  display: grid;
+  grid-template-columns: clamp(88px, 28%, 144px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.event-card-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.event-card-copy > :first-child {
+  margin-top: 0;
+}
+.event-card-copy > :last-child {
+  margin-bottom: 0;
+}
+.has-cover > .list-cover,
+.has-cover > .detail-cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3 / 4;
+  margin: 0;
+  position: relative;
+}
+.has-cover > .event-cover img {
+  position: absolute;
+  inset: 0;
+}
+.event-summary {
+  margin-bottom: 24px;
+}
+@media (max-width: 599px) {
+  .event-card-link.has-cover,
+  .event-summary.has-cover {
+    gap: 12px;
+  }
+  .has-cover .event-card-copy h1 {
+    font-size: 24px;
+  }
+  .has-cover .event-card-copy h2 {
+    font-size: 20px;
+  }
+  .has-cover .event-card-copy .timezone {
+    padding: 8px;
+    font-size: 12px;
+  }
+}
+.event-summary.has-cover .event-card-copy h1 {
+  margin: 8px 0 12px;
+}

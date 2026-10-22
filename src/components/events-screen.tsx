@@ -319,7 +319,10 @@ export function EventsScreen({
             <ul className="event-list">
               {data.events.map((e) => (
                 <li className="card" key={e.id}>
-                  <Link href={`/events/${e.id}`} className="event-card-link">
+                  <Link
+                    href={`/events/${e.id}`}
+                    className={`event-card-link${e.coverUrl ? " has-cover" : ""}`}
+                  >
                     {e.coverUrl && (
                       <div className="event-cover list-cover">
                         <Image
@@ -331,20 +334,24 @@ export function EventsScreen({
                         />
                       </div>
                     )}
-                    <h2>{e.title}</h2>
-                    <p>
-                      {new Intl.DateTimeFormat("ru-RU", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                        timeZone: "UTC",
-                      }).format(new Date(e.eventDate + "T12:00:00Z"))}
-                      {e.startTime ? " · " + e.startTime.slice(0, 5) : ""}
-                    </p>
-                    {e.startTime && (
-                      <p className="small muted">Часовой пояс: {e.timezone}</p>
-                    )}
-                    {e.venueName && <p className="muted">{e.venueName}</p>}
+                    <div className="event-card-copy">
+                      <h2>{e.title}</h2>
+                      <p>
+                        {new Intl.DateTimeFormat("ru-RU", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "UTC",
+                        }).format(new Date(e.eventDate + "T12:00:00Z"))}
+                        {e.startTime ? " · " + e.startTime.slice(0, 5) : ""}
+                      </p>
+                      {e.startTime && (
+                        <p className="small muted">
+                          Часовой пояс: {e.timezone}
+                        </p>
+                      )}
+                      {e.venueName && <p className="muted">{e.venueName}</p>}
+                    </div>
                   </Link>
                 </li>
               ))}

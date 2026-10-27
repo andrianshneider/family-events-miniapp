@@ -1,3 +1,4 @@
+import { WishlistScreen } from "@/components/wishlist-screen";
 import { it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
@@ -106,4 +107,26 @@ it("validates 300 Unicode code points after Cyrillic, emoji and IME text inserti
       false,
     );
   }
+});
+
+it("returns from gifts to the explicit source while keeping event and guest defaults", () => {
+  const fromList = renderToString(
+    createElement(WishlistScreen, {
+      eventKey: "test",
+      owner: true,
+      backToEvents: true,
+    }),
+  );
+  expect(fromList).toContain('href="/events"');
+  expect(fromList).toContain("← Мои события");
+  const fromEvent = renderToString(
+    createElement(WishlistScreen, { eventKey: "test", owner: true }),
+  );
+  expect(fromEvent).toContain('href="/events/test"');
+  expect(fromEvent).toContain("← К событию");
+  const guest = renderToString(
+    createElement(WishlistScreen, { eventKey: "test", backToEvents: true }),
+  );
+  expect(guest).toContain('href="/e/test"');
+  expect(guest).not.toContain('href="/events"');
 });

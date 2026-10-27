@@ -29,11 +29,13 @@ export function WishlistScreen({
   owner = false,
   initial = null,
   preview = false,
+  backToEvents = false,
 }: {
   eventKey: string;
   owner?: boolean;
   initial?: Wishlist | null;
   preview?: boolean;
+  backToEvents?: boolean;
 }) {
   const router = useRouter();
   const reservations = useReservations();
@@ -70,12 +72,18 @@ export function WishlistScreen({
     if (unavailable) dialog.current?.close();
   }, [unavailable]);
   const base = `/api/v1/events/${eventKey}`,
-    back = `/${owner ? "events" : "e"}/${eventKey}`;
+    back =
+      owner && backToEvents
+        ? "/events"
+        : `/${owner ? "events" : "e"}/${eventKey}`;
   function auth() {
     clear();
     dialog.current?.close();
     window.location.replace(
-      "/login?returnTo=" + encodeURIComponent(`/events/${eventKey}/wishlist`),
+      "/login?returnTo=" +
+        encodeURIComponent(
+          `/events/${eventKey}/wishlist${backToEvents ? "?from=events" : ""}`,
+        ),
     );
   }
   function close() {
@@ -196,7 +204,9 @@ export function WishlistScreen({
       {!preview && (
         <>
           <Link className="text-button back" href={back}>
-            {wishlistText("← К событию")}
+            {owner && backToEvents
+              ? "← Мои события"
+              : wishlistText("← К событию")}
           </Link>
           <h1>
             {owner ? wishlistText("Вишлист") : wishlistText("Что подарить")}

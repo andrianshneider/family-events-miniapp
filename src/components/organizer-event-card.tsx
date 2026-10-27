@@ -154,7 +154,7 @@ export function OrganizerEventCard({
           className="organizer-card-actions"
           aria-label={`Действия: ${e.title}`}
         >
-          <Link href={`/events/${e.id}/wishlist`}>
+          <Link href={`/events/${e.id}/wishlist?from=events`}>
             <Icon kind="gift" />
             Подарки
           </Link>

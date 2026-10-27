@@ -30,7 +30,7 @@ it("renders the first real event and profile in server HTML before client effect
   expect(html).toContain("Server event");
   expect(html).toContain("Organizer");
   expect(html).toContain("Ответов гостей: 2");
-  expect(html).toContain('href="/events/event/wishlist"');
+  expect(html).toContain('href="/events/event/wishlist?from=events"');
   expect(html).toContain('href="/events/event/guests"');
   expect(html).not.toContain("Загружаем события");
   expect(fetch).not.toHaveBeenCalled();

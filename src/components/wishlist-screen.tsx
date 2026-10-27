@@ -322,25 +322,10 @@ export function WishlistScreen({
               />
             ))}
           </div>
-          {!data.total && (
+          {!data.total && !owner && (
             <section className="panel">
               <h2>{wishlistText("Wishlist пока пуст")}</h2>
-              <p>
-                {owner
-                  ? wishlistText(
-                      "Добавьте идеи подарков, чтобы гостям было проще выбрать.",
-                    )
-                  : wishlistText("Организатор ещё не добавил идеи подарков.")}
-              </p>
-              {owner && (
-                <button
-                  className="primary"
-                  disabled={disabled}
-                  onClick={() => open(null)}
-                >
-                  {wishlistText("Добавить подарок")}
-                </button>
-              )}
+              <p>{wishlistText("Организатор ещё не добавил идеи подарков.")}</p>
             </section>
           )}
           {!preview && data.nextCursor && (

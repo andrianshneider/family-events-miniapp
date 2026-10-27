@@ -1,0 +1,14 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "env": {
+    "VERCEL_PREVIEW_FEEDBACK_ENABLED": "0"
+  },
+  "build": {
+    "env": {
+      "VERCEL_PREVIEW_FEEDBACK_ENABLED": "0"
+    }
+  },
+  "regions": ["fra1"]
+}

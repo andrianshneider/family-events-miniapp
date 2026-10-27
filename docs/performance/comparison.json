@@ -1,0 +1,43 @@
+[
+  {
+    "metric": "Открытие списка с данными",
+    "before": 1913,
+    "after": 316,
+    "reduction_percent": 83.5,
+    "speed_gain_percent": 505.4
+  },
+  {
+    "metric": "Обновление списка",
+    "before": 1367,
+    "after": 287,
+    "reduction_percent": 79.0,
+    "speed_gain_percent": 376.3
+  },
+  {
+    "metric": "API профиля",
+    "before": 676,
+    "after": 215,
+    "reduction_percent": 68.2,
+    "speed_gain_percent": 214.4
+  },
+  {
+    "metric": "API событий",
+    "before": 683,
+    "after": 287,
+    "reduction_percent": 58.0,
+    "speed_gain_percent": 138.0
+  },
+  {
+    "metric": "Загрузка обложки",
+    "before": 1182,
+    "after": 496,
+    "reduction_percent": 58.0,
+    "speed_gain_percent": 138.3
+  },
+  {
+    "metric": "Размер обложки, байт",
+    "before": 718786,
+    "after": 81850,
+    "reduction_percent": 88.6
+  }
+]

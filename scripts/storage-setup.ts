@@ -1,0 +1,27 @@
+import nextEnv from "@next/env";
+const { loadEnvConfig } = nextEnv;
+import { createClient } from "@supabase/supabase-js";
+loadEnvConfig(process.cwd());
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY)
+  throw new Error("Server Storage configuration required");
+const client = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } },
+);
+const bucket = process.env.SUPABASE_MEDIA_BUCKET ?? "event-media";
+const options = {
+  public: false,
+  fileSizeLimit: 10485760,
+  allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+};
+const existing = await client.storage.getBucket(bucket);
+const result = existing.data
+  ? await client.storage.updateBucket(bucket, options)
+  : await client.storage.createBucket(bucket, options);
+if (result.error)
+  throw new Error("Storage setup failed: " + result.error.message);
+const verified = await client.storage.getBucket(bucket);
+if (verified.error || verified.data.public)
+  throw new Error("Private bucket verification failed");
+console.info("Private media bucket configured.");

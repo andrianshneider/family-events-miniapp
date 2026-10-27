@@ -1,0 +1,268 @@
+"use client";
+import { adultsCount, childrenCount, peopleCount } from "@/lib/russian-count";
+import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
+import Link from "next/link";
+import { watchEventChanges } from "@/lib/event-updates";
+import { OrganizerEventCard } from "./organizer-event-card";
+import { useEffect, useRef, useState } from "react";
+import type { organizerEvent } from "@/server/services/events";
+import { GuestCard } from "./guest-card";
+import { EventActions } from "./event-actions";
+import { OrganizerHeader } from "./organizer-header";
+type Event = Awaited<ReturnType<typeof organizerEvent>>;
+export function EventScreen({
+  initialEvent,
+  created,
+  updated = false,
+}: {
+  initialEvent: Event;
+  created: boolean;
+  updated?: boolean;
+}) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.focus();
+  }, []);
+  const [event, setEvent] = useState(initialEvent);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const [unavailable, setUnavailable] = useState(false);
+  useAnalyticsError("event_view", unavailable, {
+    kind: "management",
+    id: initialEvent.id,
+  });
+  useAnalyticsView(
+    "event_viewed",
+    { kind: "management", id: initialEvent.id },
+    { view_mode: "management" },
+    !unavailable,
+  );
+  const refreshing = useRef(false);
+  const refreshedAt = useRef(0);
+  async function refresh() {
+    if (refreshing.current || document.querySelector("dialog[open]")) return;
+    refreshing.current = true;
+    setPending(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/v1/events/${initialEvent.id}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      if (response.status === 401) {
+        setUnavailable(true);
+        window.location.replace("/login");
+        return;
+      }
+      if (response.status === 404) {
+        setUnavailable(true);
+        return;
+      }
+      if (!response.ok) throw Error();
+      setEvent((await response.json()).data);
+    } catch {
+      setError(
+        "Не удалось обновить событие. Сохранённые сведения остаются на экране; повторите попытку.",
+      );
+    } finally {
+      refreshing.current = false;
+      refreshedAt.current = Date.now();
+      setPending(false);
+    }
+  }
+  useEffect(() => {
+    const restore = () => {
+      if (
+        document.visibilityState === "visible" &&
+        Date.now() - refreshedAt.current > 1000
+      )
+        void refresh();
+    };
+    const show = (event: PageTransitionEvent) => {
+      if (event.persisted && Date.now() - refreshedAt.current > 1000)
+        void refresh();
+    };
+    document.addEventListener("visibilitychange", restore);
+    window.addEventListener("pageshow", show);
+    window.addEventListener("online", restore);
+    const interval = window.setInterval(restore, 5000);
+    const stopWatching = watchEventChanges(restore);
+    return () => {
+      document.removeEventListener("visibilitychange", restore);
+      window.removeEventListener("pageshow", show);
+      window.removeEventListener("online", restore);
+      window.clearInterval(interval);
+      stopWatching();
+    };
+    // Only the stable event ID identifies this subscription; server rechecks ownership on each request.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEvent.id]);
+  if (unavailable)
+    return (
+      <main className="shell">
+        <h1>Событие недоступно</h1>
+        <p>Оно удалено или у вас нет доступа.</p>
+        <Link href="/events" className="secondary">
+          Мои события
+        </Link>
+      </main>
+    );
+  return (
+    <main className="shell event-shell">
+      <OrganizerHeader displayName={event.displayName} />
+      <Link className="text-button back" href="/events">
+        ← Мои события
+      </Link>
+      {created && (
+        <p className="notice success" role="status">
+          Событие создано. Следующий шаг — пригласить гостей по ссылке.
+        </p>
+      )}
+      {updated && (
+        <p className="notice success" role="status">
+          Изменения сохранены
+        </p>
+      )}
+      {error && (
+        <div className="notice error" role="alert">
+          {error}
+          <button className="text-button" onClick={refresh} disabled={pending}>
+            Попробовать снова
+          </button>
+        </div>
+      )}
+      <div className="event-layout event-detail" aria-busy={pending}>
+        <section className="event-management-information">
+          <OrganizerEventCard
+            event={{
+              ...event,
+              responseCount:
+                event.responses.yes +
+                event.responses.no +
+                event.responses.maybe,
+            }}
+            headingRef={heading}
+            detail={{ refresh, pending }}
+          />
+          <EventActions
+            id={event.id}
+            title={event.title}
+            version={event.version}
+            onConflict={() => void refresh()}
+          />
+          {(event.address ||
+            event.directions ||
+            event.description ||
+            event.dressCode) && (
+            <details className="panel event-extra-details">
+              <summary>Подробности события</summary>
+              {[
+                ["Адрес", event.address],
+                ["Как найти", event.directions],
+                ["Описание", event.description],
+                ["Дресс-код", event.dressCode],
+              ].map(([label, value]) =>
+                value ? (
+                  <section className="event-text" key={label}>
+                    <h2>{label}</h2>
+                    <p>{value}</p>
+                  </section>
+                ) : null,
+              )}
+            </details>
+          )}
+        </section>
+        <aside className="form-panels">
+          <section className="panel">
+            <h2>Ответы гостей</h2>
+            <p>
+              <strong>
+                Ожидаем{" "}
+                {peopleCount(event.responses.adults + event.responses.children)}
+              </strong>
+            </p>
+            <p className="hint">
+              Ответов:{" "}
+              {event.responses.yes + event.responses.no + event.responses.maybe}
+            </p>
+            <p className="hint">
+              Подтвердили: {adultsCount(event.responses.adults)} ·{" "}
+              {childrenCount(event.responses.children)}
+            </p>
+            <div className="response-summary">
+              <p>
+                <strong>{event.responses.yes}</strong>
+                <span>Будут</span>
+              </p>
+              <p>
+                <strong>{event.responses.no}</strong>
+                <span>Не будут</span>
+              </p>
+              <p>
+                <strong>{event.responses.maybe}</strong>
+                <span>Пока не знают</span>
+              </p>
+            </div>
+            <p className="muted">
+              {event.responses.yes + event.responses.no + event.responses.maybe
+                ? "Ответы сохранены в событии."
+                : "Пока никто не ответил на приглашение."}
+            </p>
+            <div className="latest-guests">
+              {event.latestResponses.map((guest) => (
+                <GuestCard guest={guest} key={guest.id} />
+              ))}
+            </div>
+            <Link
+              className="secondary route-link"
+              href={`/events/${event.id}/guests`}
+            >
+              Посмотреть всех
+            </Link>
+          </section>
+          <section className="panel">
+            <h2>Подарки</h2>
+            <p>
+              {event.wishlist.gifts
+                ? `Подарков: ${event.wishlist.gifts}`
+                : "Подарков пока нет."}
+            </p>
+            <p className="muted">
+              {event.wishlist.surprise
+                ? "Режим сюрприза включён."
+                : "Режим сюрприза выключен."}
+            </p>
+            <p>Выбрано: {event.wishlist.reserved}</p>
+            <Link
+              className="secondary route-link"
+              href={`/events/${event.id}/wishlist`}
+            >
+              Управлять подарками
+            </Link>
+          </section>
+          <section className="panel">
+            <h2>Уведомления</h2>
+            {event.pendingChangeId && (
+              <Link
+                className="secondary route-link"
+                href={`/events/${event.id}/changes/${event.pendingChangeId}`}
+              >
+                Отправить гостям сохранённые изменения
+              </Link>
+            )}
+            <p className="muted">
+              Подключите Telegram, чтобы узнавать о новых и изменённых ответах
+              гостей.
+            </p>
+            <Link
+              className="secondary route-link"
+              href={`/events/${event.id}/notifications`}
+            >
+              Настроить уведомления
+            </Link>
+          </section>
+        </aside>
+      </div>
+    </main>
+  );
+}

@@ -1,4 +1,5 @@
 "use client";
+import { adultsCount, childrenCount, peopleCount } from "@/lib/russian-count";
 import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import Link from "next/link";
 import { watchEventChanges } from "@/lib/event-updates";
@@ -114,7 +115,7 @@ export function EventScreen({
       </Link>
       {created && (
         <p className="notice success" role="status">
-          Событие создано
+          Событие создано. Следующий шаг — пригласить гостей по ссылке.
         </p>
       )}
       {updated && (
@@ -122,12 +123,6 @@ export function EventScreen({
           Изменения сохранены
         </p>
       )}
-      <EventActions
-        id={event.id}
-        title={event.title}
-        version={event.version}
-        onConflict={() => void refresh()}
-      />
       {error && (
         <div className="notice error" role="alert">
           {error}
@@ -149,11 +144,18 @@ export function EventScreen({
             headingRef={heading}
             detail={{ refresh, pending }}
           />
+          <EventActions
+            id={event.id}
+            title={event.title}
+            version={event.version}
+            onConflict={() => void refresh()}
+          />
           {(event.address ||
             event.directions ||
             event.description ||
             event.dressCode) && (
-            <div className="panel event-extra-details">
+            <details className="panel event-extra-details">
+              <summary>Подробности события</summary>
               {[
                 ["Адрес", event.address],
                 ["Как найти", event.directions],
@@ -167,15 +169,25 @@ export function EventScreen({
                   </section>
                 ) : null,
               )}
-            </div>
+            </details>
           )}
         </section>
         <aside className="form-panels">
           <section className="panel">
             <h2>Ответы гостей</h2>
+            <p>
+              <strong>
+                Ожидаем{" "}
+                {peopleCount(event.responses.adults + event.responses.children)}
+              </strong>
+            </p>
             <p className="hint">
-              Подтвердили: {event.responses.adults} взрослых ·{" "}
-              {event.responses.children} детей
+              Ответов:{" "}
+              {event.responses.yes + event.responses.no + event.responses.maybe}
+            </p>
+            <p className="hint">
+              Подтвердили: {adultsCount(event.responses.adults)} ·{" "}
+              {childrenCount(event.responses.children)}
             </p>
             <div className="response-summary">
               <p>
@@ -209,11 +221,11 @@ export function EventScreen({
             </Link>
           </section>
           <section className="panel">
-            <h2>Вишлист</h2>
+            <h2>Подарки</h2>
             <p>
               {event.wishlist.gifts
                 ? `Подарков: ${event.wishlist.gifts}`
-                : "Вишлист создан. Подарков пока нет."}
+                : "Подарков пока нет."}
             </p>
             <p className="muted">
               {event.wishlist.surprise
@@ -225,7 +237,7 @@ export function EventScreen({
               className="secondary route-link"
               href={`/events/${event.id}/wishlist`}
             >
-              Управлять wishlist
+              Управлять подарками
             </Link>
           </section>
           <section className="panel">
@@ -247,16 +259,6 @@ export function EventScreen({
               href={`/events/${event.id}/notifications`}
             >
               Настроить уведомления
-            </Link>
-          </section>
-          <section className="panel">
-            <h2>Пригласите близких</h2>
-            <p className="muted">
-              Отправьте близким ссылку на событие. Приглашение откроется без
-              регистрации.
-            </p>
-            <Link className="primary" href={`/events/${event.id}/share`}>
-              Пригласить гостей
             </Link>
           </section>
         </aside>

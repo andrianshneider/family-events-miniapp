@@ -156,14 +156,11 @@ export function EventActions({
         }}
       />
       <div className="event-actions">
-        <Link href={`/events/${id}/edit`} className="primary">
-          Редактировать событие
+        <Link href={`/events/${id}/edit`} className="secondary">
+          Редактировать
         </Link>
-        <Link
-          href={`/events/${id}/share`}
-          className="secondary event-share-link"
-        >
-          Поделиться
+        <Link href={`/events/${id}/share`} className="primary event-share-link">
+          Пригласить гостей
         </Link>
         <button
           ref={opener}

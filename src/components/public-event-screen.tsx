@@ -1,5 +1,5 @@
 "use client";
-import {useAnalyticsError,useAnalyticsView} from "@/lib/analytics/client";
+import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
 import { WishlistScreen } from "./wishlist-screen";
@@ -19,8 +19,16 @@ export function PublicEventScreen({
   const [unavailable, setUnavailable] = useState(false);
   const [pending, setPending] = useState(false);
   const [offline, setOffline] = useState(false);
-  useAnalyticsView("event_viewed",{kind:"public",id:initialEvent.publicId},{view_mode:"public"},!unavailable);
-  useAnalyticsError("event_view",unavailable,{kind:"public",id:initialEvent.publicId});
+  useAnalyticsView(
+    "event_viewed",
+    { kind: "public", id: initialEvent.publicId },
+    { view_mode: "public" },
+    !unavailable,
+  );
+  useAnalyticsError("event_view", unavailable, {
+    kind: "public",
+    id: initialEvent.publicId,
+  });
   const closeEvent = useCallback(() => setUnavailable(true), []);
   const flight = useRef(false),
     last = useRef(0);
@@ -118,11 +126,35 @@ export function PublicEventScreen({
           )}
           {pending && <p role="status">Обновляем приглашение…</p>}
           <div className="public-layout public-information" aria-busy={pending}>
-            <EventInformation event={event} />
-            <aside className="public-side">
+            <div className="public-summary">
+              <EventInformation event={event} part="summary" />
+            </div>
+            <aside
+              className="public-answer"
+              id="invitation-answer"
+              tabIndex={-1}
+            >
               <RsvpCard event={event} onUnavailable={closeEvent} />
-              <WishlistScreen eventKey={event.publicId} preview initial={initialWishlist} />
             </aside>
+            <div className="public-address">
+              <EventInformation event={event} part="address" />
+            </div>
+            <div className="public-gifts">
+              <WishlistScreen
+                eventKey={event.publicId}
+                preview
+                initial={initialWishlist}
+              />
+            </div>
+            <div className="public-details">
+              {(event.description || event.directions || event.dressCode) && <a className="text-button" href="#invitation-answer">Ответить на приглашение ↑</a>}
+              <EventInformation event={event} part="details" />
+              {(event.description || event.directions || event.dressCode) && (
+                <a className="text-button" href="#invitation-answer">
+                  Вернуться к ответу ↑
+                </a>
+              )}
+            </div>
           </div>
           <footer className="public-footer">
             Личная встреча по приглашению

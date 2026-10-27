@@ -1,5 +1,6 @@
 "use client";
-import {capture,failure,telemetryHeaders} from "@/lib/analytics/client";
+import { adultsCount, childrenCount } from "@/lib/russian-count";
+import { capture, failure, telemetryHeaders } from "@/lib/analytics/client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
@@ -79,7 +80,7 @@ export function RsvpCard({
         contextRef.current.contextKey !== data.contextKey
       )
         setNotice(
-          "Гостевая сессия изменилась. Прежний анонимный ответ не восстановить по имени.",
+          "Данные гостя изменились. Прежний ответ нельзя восстановить только по имени.",
         );
       if (
         contextRef.current?.contextKey &&
@@ -190,7 +191,15 @@ export function RsvpCard({
             }
           : { ...empty, status, guestName: context.defaultName ?? "" },
       );
-    void capture("rsvp_started",{mode:context.rsvp?"edit":"create",form_instance_id:crypto.randomUUID(),initial_status:status},{kind:"public",id:event.publicId});
+    void capture(
+      "rsvp_started",
+      {
+        mode: context.rsvp ? "edit" : "create",
+        form_instance_id: crypto.randomUUID(),
+        initial_status: status,
+      },
+      { kind: "public", id: event.publicId },
+    );
     setModalOpen(true);
     dialog.current?.showModal();
   }
@@ -223,7 +232,8 @@ export function RsvpCard({
         return load();
       }
       throw Error(
-        result.error?.message ?? "Не удалось подготовить гостевую сессию.",
+        result.error?.message ??
+          "Не удалось подготовить ответ. Проверьте соединение и попробуйте снова.",
       );
     }
     return load();
@@ -232,7 +242,7 @@ export function RsvpCard({
     if (busy.current || offline || context?.sessionState === "lost" || conflict)
       return;
     let operation = attempt;
-    let analyticsFailed=false;
+    let analyticsFailed = false;
     const payload = {
       ...draft,
       adultsCount: draft.status === "no" ? 0 : draft.adultsCount,
@@ -242,7 +252,12 @@ export function RsvpCard({
     if (!operation) {
       const parsed = rsvpInput.safeParse(payload);
       if (!parsed.success) {
-        failure("rsvp_save",crypto.randomUUID(),{kind:"public",id:event.publicId},{code:"VALIDATION_ERROR"});
+        failure(
+          "rsvp_save",
+          crypto.randomUUID(),
+          { kind: "public", id: event.publicId },
+          { code: "VALIDATION_ERROR" },
+        );
         const fieldErrors: Record<string, string> = {};
         for (const issue of parsed.error.issues)
           fieldErrors[String(issue.path[0])] =
@@ -272,7 +287,7 @@ export function RsvpCard({
       const fresh = operation ? await load() : await bootstrap();
       if (fresh.sessionState !== "active" || !fresh.contextKey)
         throw Error(
-          "Гостевая сессия недоступна. Подтвердите создание новой сессии отдельно.",
+          "Не удалось узнать ваш прежний ответ. Чтобы ответить заново, подтвердите продолжение как новый гость.",
         );
       if (operation && operation.contextKey !== fresh.contextKey) {
         setConflict(true);
@@ -303,7 +318,9 @@ export function RsvpCard({
       });
       if (!csrf.ok) {
         await load();
-        throw Error("Гостевая сессия истекла. Отправка остановлена.");
+        throw Error(
+          "Не удалось подтвердить данные гостя. Ответ не отправлен; откройте приглашение на прежнем устройстве.",
+        );
       }
       const token = (await csrf.json()).data.csrfToken;
       setAttempt(operation);
@@ -320,7 +337,15 @@ export function RsvpCard({
         signal: AbortSignal.timeout(15000),
       });
       const result = await response.json();
-      if(!response.ok){analyticsFailed=true;failure("rsvp_save",operation.key,{kind:"public",id:event.publicId},{code:result.error?.code});}
+      if (!response.ok) {
+        analyticsFailed = true;
+        failure(
+          "rsvp_save",
+          operation.key,
+          { kind: "public", id: event.publicId },
+          { code: result.error?.code },
+        );
+      }
       if (response.status === 404) {
         onUnavailable();
         return;
@@ -350,7 +375,13 @@ export function RsvpCard({
       setConflict(false);
       announceEventChange();
     } catch (caught) {
-      if(!analyticsFailed)failure("rsvp_save",operation?.key??crypto.randomUUID(),{kind:"public",id:event.publicId},caught);
+      if (!analyticsFailed)
+        failure(
+          "rsvp_save",
+          operation?.key ?? crypto.randomUUID(),
+          { kind: "public", id: event.publicId },
+          caught,
+        );
       setError(
         sent
           ? "Результат пока неизвестен. Нажмите «Проверить сохранение»: повторим прежнюю операцию без дубля."
@@ -367,7 +398,7 @@ export function RsvpCard({
     if (busy.current || offline || attempt) return;
     if (
       !window.confirm(
-        "Прежний анонимный ответ недоступен. Создать новую гостевую сессию? Это не восстановит ответ по имени.",
+        "Прежний ответ недоступен. Продолжить как новый гость? Прежний ответ и выбор подарков не восстановятся по имени.",
       )
     )
       return;
@@ -376,11 +407,13 @@ export function RsvpCard({
     try {
       await bootstrap(true);
       setNotice(
-        "Новая сессия готова. Ответ не отправлен; проверьте форму и подтвердите отдельно.",
+        "Можно ответить как новый гость. Ответ ещё не отправлен; проверьте и подтвердите форму.",
       );
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Не удалось создать сессию.",
+        caught instanceof Error
+          ? caught.message
+          : "Не удалось продолжить как новый гость. Попробуйте снова.",
       );
     } finally {
       busy.current = false;
@@ -436,15 +469,14 @@ export function RsvpCard({
           {lost ? (
             <>
               <p className="notice">
-                Гостевая сессия недоступна. Прежний анонимный ответ нельзя
-                восстановить по имени.
+                Ваш прежний ответ недоступен. Его нельзя восстановить по имени.
               </p>
               <button
                 className="secondary"
                 disabled={pending || offline || !!attempt}
                 onClick={restart}
               >
-                Создать новую гостевую сессию
+                Продолжить как новый гость
               </button>
               {attempt && (
                 <button
@@ -452,7 +484,7 @@ export function RsvpCard({
                   onClick={() => {
                     if (
                       window.confirm(
-                        "Результат прежней операции недоступен без старой сессии. Отказаться от её проверки? Новая сессия не восстановит анонимный ответ.",
+                        "Не удалось проверить прежнюю отправку. Прекратить проверку и ответить заново? Это не восстановит прежний ответ.",
                       )
                     ) {
                       setAttempt(null);
@@ -460,7 +492,7 @@ export function RsvpCard({
                     }
                   }}
                 >
-                  Отказаться от проверки прежнего запроса
+                  Прекратить проверку отправки
                 </button>
               )}
             </>
@@ -471,8 +503,8 @@ export function RsvpCard({
               </p>
               {context.rsvp.status !== "no" && (
                 <p>
-                  {context.rsvp.adultsCount} взрослых ·{" "}
-                  {context.rsvp.childrenCount} детей
+                  {adultsCount(context.rsvp.adultsCount)} ·{" "}
+                  {childrenCount(context.rsvp.childrenCount)}
                 </p>
               )}
               <button
@@ -480,7 +512,7 @@ export function RsvpCard({
                 disabled={pending || offline}
                 onClick={() => open(context.rsvp!.status)}
               >
-                Изменить
+                Изменить ответ
               </button>
             </>
           ) : (
@@ -503,8 +535,9 @@ export function RsvpCard({
             </p>
           )}
           <p className="hint">
-            Регистрация не нужна. Ответ доступен в этой гостевой сессии; другой
-            браузер или удаление cookies могут создать другого гостя.
+            Регистрация не нужна. Изменить ответ можно на этом устройстве. После
+            очистки данных браузера или на другом устройстве прежний ответ может
+            быть недоступен.
           </p>
         </>
       )}
@@ -543,7 +576,7 @@ export function RsvpCard({
             )}
             <p>Ваш ответ: {context?.rsvp && rsvpLabels[context.rsvp.status]}</p>
             <Link
-              className="primary route-link"
+              className="text-button route-link"
               href={`/e/${event.publicId}/notifications`}
             >
               Получать напоминания в Telegram
@@ -552,7 +585,7 @@ export function RsvpCard({
               className="secondary route-link"
               href={`/e/${event.publicId}/wishlist`}
             >
-              Посмотреть wishlist
+              Что подарить
             </Link>
             <button className="primary" autoFocus onClick={close}>
               К событию
@@ -700,15 +733,26 @@ export function RsvpCard({
                   <textarea
                     name="comment"
                     value={draft.comment}
-                    maxLength={600}
                     placeholder="Например, будем немного позже"
                     onChange={(e) =>
                       setDraft({ ...draft, comment: e.target.value })
                     }
                     aria-invalid={!!errors.comment}
+                    aria-describedby="rsvp-comment-count"
                   />
                 </label>
-                <p className="hint">{[...draft.comment].length}/300</p>
+                <p
+                  className={
+                    [...draft.comment.trim()].length > 300 ? "error" : "hint"
+                  }
+                  aria-live="polite"
+                  id="rsvp-comment-count"
+                >
+                  {[...draft.comment.trim()].length}/300
+                  {[...draft.comment.trim()].length > 300
+                    ? " — сократите комментарий"
+                    : ""}
+                </p>
               </fieldset>
               {Object.entries(errors)
                 .filter(([key]) => key !== "guestName")
@@ -722,7 +766,11 @@ export function RsvpCard({
                   {error}
                 </p>
               )}
-              {offline && <p role="status">Нет соединения. Ввод сохранён.</p>}
+              {offline && (
+                <p role="status">
+                  Нет соединения. Ввод остаётся в форме; ответ ещё не отправлен.
+                </p>
+              )}
               {conflict && (
                 <button
                   type="button"

@@ -1,5 +1,5 @@
 "use client";
-import {capture,failure,clientPlatform} from "@/lib/analytics/client";
+import { capture, failure, clientPlatform } from "@/lib/analytics/client";
 import Link from "next/link";
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -99,7 +99,7 @@ export function ShareEventScreen({
     };
   }, [refresh]);
   async function copy() {
-    const analyticsAttempt=crypto.randomUUID();
+    const analyticsAttempt = crypto.randomUUID();
     if (busy.current) return;
     busy.current = true;
     setAction("copy");
@@ -107,10 +107,17 @@ export function ShareEventScreen({
     setError("");
     try {
       await copyInvitation(data.publicUrl, navigator.clipboard);
-      void capture("invitation_link_copied",{share_channel:"copy",attempt_id:analyticsAttempt},{kind:"management",id:eventId});
+      void capture(
+        "invitation_link_copied",
+        { share_channel: "copy", attempt_id: analyticsAttempt },
+        { kind: "management", id: eventId },
+      );
       setFeedback("Ссылка скопирована");
     } catch {
-      failure("invitation_copy",analyticsAttempt,{kind:"management",id:eventId});
+      failure("invitation_copy", analyticsAttempt, {
+        kind: "management",
+        id: eventId,
+      });
       setError(
         "Не удалось скопировать автоматически. Ссылка выделена — скопируйте её вручную.",
       );
@@ -123,8 +130,13 @@ export function ShareEventScreen({
   }
   async function share() {
     if (busy.current || offline) return;
-    const analyticsAttempt=crypto.randomUUID(),channel=clientPlatform()==="telegram"?"telegram":"native";
-    void capture("share_initiated",{share_channel:channel,attempt_id:analyticsAttempt},{kind:"management",id:eventId});
+    const analyticsAttempt = crypto.randomUUID(),
+      channel = clientPlatform() === "telegram" ? "telegram" : "native";
+    void capture(
+      "share_initiated",
+      { share_channel: channel, attempt_id: analyticsAttempt },
+      { kind: "management", id: eventId },
+    );
     busy.current = true;
     setAction("share");
     setFeedback("");
@@ -144,13 +156,30 @@ export function ShareEventScreen({
         share: navigator.share?.bind(navigator),
         telegram: app?.initData ? app : undefined,
       });
-      void capture("share_result",{share_channel:channel,attempt_id:analyticsAttempt,outcome:result},{kind:"management",id:eventId});
+      void capture(
+        "share_result",
+        {
+          share_channel: channel,
+          attempt_id: analyticsAttempt,
+          outcome: result,
+        },
+        { kind: "management", id: eventId },
+      );
       if (result === "unsupported")
         setFeedback(
           "Системное меню отправки недоступно. Скопируйте ссылку или откройте Telegram.",
         );
     } catch {
-      void capture("share_result",{share_channel:channel,attempt_id:analyticsAttempt,outcome:"failed",error_code:"UNKNOWN"},{kind:"management",id:eventId});
+      void capture(
+        "share_result",
+        {
+          share_channel: channel,
+          attempt_id: analyticsAttempt,
+          outcome: "failed",
+          error_code: "UNKNOWN",
+        },
+        { kind: "management", id: eventId },
+      );
       setError(
         "Не удалось открыть отправку. Скопируйте ссылку или попробуйте Telegram.",
       );
@@ -175,11 +204,35 @@ export function ShareEventScreen({
         };
       }
     ).Telegram?.WebApp;
-    const attempt=crypto.randomUUID();
-    void capture("share_initiated",{share_channel:"telegram",attempt_id:attempt},{kind:"management",id:eventId});
-    try {if (app?.initData && app.openTelegramLink) {e.preventDefault();app.openTelegramLink(telegramShareUrl(data));}
-      void capture("share_result",{share_channel:"telegram",attempt_id:attempt,outcome:"ready"},{kind:"management",id:eventId});
-    }catch {e.preventDefault();void capture("share_result",{share_channel:"telegram",attempt_id:attempt,outcome:"failed",error_code:"UNKNOWN"},{kind:"management",id:eventId});}
+    const attempt = crypto.randomUUID();
+    void capture(
+      "share_initiated",
+      { share_channel: "telegram", attempt_id: attempt },
+      { kind: "management", id: eventId },
+    );
+    try {
+      if (app?.initData && app.openTelegramLink) {
+        e.preventDefault();
+        app.openTelegramLink(telegramShareUrl(data));
+      }
+      void capture(
+        "share_result",
+        { share_channel: "telegram", attempt_id: attempt, outcome: "ready" },
+        { kind: "management", id: eventId },
+      );
+    } catch {
+      e.preventDefault();
+      void capture(
+        "share_result",
+        {
+          share_channel: "telegram",
+          attempt_id: attempt,
+          outcome: "failed",
+          error_code: "UNKNOWN",
+        },
+        { kind: "management", id: eventId },
+      );
+    }
   }
   return (
     <main className="shell event-shell share-shell">
@@ -232,28 +285,6 @@ export function ShareEventScreen({
           {pending && <p role="status">Обновляем приглашение…</p>}
           <div className="invitation-layout" aria-busy={pending}>
             <section
-              className="panel invitation-preview"
-              aria-label="Предпросмотр приглашения"
-            >
-              <div className="event-cover public-cover">
-                {data.event.coverUrl ? (
-                  <Image
-                    unoptimized
-                    width={1000}
-                    height={600}
-                    src={data.event.coverUrl}
-                    alt={`Обложка события «${data.event.title}»`}
-                  />
-                ) : (
-                  <span aria-hidden="true">♡</span>
-                )}
-              </div>
-              <h2>{data.event.title}</h2>
-              <p>{eventWhen(data.event)}</p>
-              <p className="timezone">Время события · {data.event.timezone}</p>
-              {data.event.venueName && <p>{data.event.venueName}</p>}
-            </section>
-            <section
               className="invitation-controls"
               aria-label="Ссылка и отправка"
             >
@@ -300,10 +331,38 @@ export function ShareEventScreen({
               >
                 Отправить через Telegram ↗
               </a>
-              <Link className="text-button" href={`/e/${data.event.publicId}`}>
-                Посмотреть приглашение ↗
-              </Link>
             </section>
+            <section
+              className="panel invitation-preview"
+              aria-label="Предпросмотр приглашения"
+            >
+              {data.event.coverUrl && (
+                <div className="event-cover public-cover">
+                  {data.event.coverUrl ? (
+                    <Image
+                      unoptimized
+                      width={1000}
+                      height={600}
+                      src={data.event.coverUrl}
+                      alt={`Обложка события «${data.event.title}»`}
+                    />
+                  ) : (
+                    <span aria-hidden="true">♡</span>
+                  )}
+                </div>
+              )}
+              <h2>{data.event.title}</h2>
+              <p>{eventWhen(data.event)}</p>
+              <p className="timezone">Время события · {data.event.timezone}</p>
+              {data.event.venueName && <p>{data.event.venueName}</p>}
+            </section>
+
+            <div className="invitation-open">
+              {" "}
+              <Link className="text-button" href={`/e/${data.event.publicId}`}>
+                Открыть приглашение
+              </Link>
+            </div>
           </div>
         </>
       )}

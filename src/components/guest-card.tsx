@@ -1,3 +1,4 @@
+import { adultsCount, childrenCount } from "@/lib/russian-count";
 import type { Rsvp } from "@/lib/rsvp";
 export function GuestCard({ guest }: { guest: Rsvp }) {
   return (
@@ -8,7 +9,8 @@ export function GuestCard({ guest }: { guest: Rsvp }) {
       </p>
       {guest.status !== "no" && (
         <p>
-          {guest.adultsCount} взрослых · {guest.childrenCount} детей
+          {adultsCount(guest.adultsCount)} ·{" "}
+          {childrenCount(guest.childrenCount)}
         </p>
       )}
       {guest.comment && <p className="guest-comment">{guest.comment}</p>}

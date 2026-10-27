@@ -1,9 +1,17 @@
 "use client";
+import { ImageFileInput } from "./image-file-input";
 import { prepareCoverImage } from "@/lib/prepare-cover-image";
 import { capture, failure, telemetryHeaders } from "@/lib/analytics/client";
 import { announceEventChange, watchEventChanges } from "@/lib/event-updates";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Image from "next/image";
+import { EventInformation } from "./event-information";
 import { TimePicker } from "./time-picker";
 import { useRouter } from "next/navigation";
 import { eventInput } from "@/lib/validation";
@@ -13,7 +21,7 @@ import {
   type EventFields as Fields,
   type CreateAttempt as Attempt,
 } from "@/lib/event-form-state";
-import { eventDateLabel, eventTypes } from "./event-presentation";
+import { eventTypes } from "./event-presentation";
 import { TelegramBack } from "./telegram-back";
 import { OrganizerHeader } from "./organizer-header";
 function clearSaved(storageKey: string) {
@@ -61,6 +69,11 @@ const groups: {
         required: true,
         hint: "Сегодня или позже",
       },
+    ],
+  },
+  {
+    title: "Время встречи",
+    fields: [
       { key: "startTime", label: "Начало", type: "time" },
       {
         key: "endTime",
@@ -91,6 +104,29 @@ const groups: {
     ],
   },
 ];
+function FormSection({
+  required,
+  title,
+  children,
+}: {
+  required: boolean;
+  title: string;
+  children: ReactNode;
+}) {
+  if (required)
+    return (
+      <section className="panel">
+        <h2>{title}</h2>
+        {children}
+      </section>
+    );
+  return (
+    <details className="panel form-section">
+      <summary>{title}</summary>
+      {children}
+    </details>
+  );
+}
 export function CreateEventScreen({
   userId,
   displayName,
@@ -122,11 +158,21 @@ export function CreateEventScreen({
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [locallySaved, setLocallySaved] = useState<boolean | null>(null);
   const [error, setError] = useState("");
   const [unavailable, setUnavailable] = useState(false);
   const [coverError, setCoverError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const form = useRef<HTMLFormElement>(null);
+  function focusField(key: string) {
+    requestAnimationFrame(() => {
+      const field = form.current?.querySelector<HTMLElement>(`[id="${key}"]`);
+      const section = field?.closest("details");
+      if (section) section.open = true;
+      field?.focus();
+      field?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }
   const analyticsForm = useRef<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
@@ -147,7 +193,9 @@ export function CreateEventScreen({
             savedAt: Date.now(),
           }),
         );
+        return true;
       } catch {
+        return false;
         /* The current form remains in memory when browser storage is unavailable. */
       }
     },
@@ -221,7 +269,7 @@ export function CreateEventScreen({
             (await current.json()).data.version !== editing.version
           ) {
             setError(
-              "Событие изменилось в другой вкладке. Ваш ввод сохранён; загрузите актуальную версию перед сохранением.",
+              "Событие изменилось в другой вкладке. Ваш ввод остаётся в форме. Скопируйте его перед загрузкой актуальных сведений.",
             );
           }
         }
@@ -278,7 +326,7 @@ export function CreateEventScreen({
     const next = { ...fieldsRef.current, [key]: value };
     fieldsRef.current = next;
     setFields(next);
-    persist(next, attempt);
+    setLocallySaved(persist(next, attempt));
     setFieldErrors((current) => ({ ...current, [key]: [] }));
   }
   function leave() {
@@ -310,7 +358,9 @@ export function CreateEventScreen({
       throw Error("Войдите снова, чтобы продолжить.");
     }
     if (!profile.ok)
-      throw Error("Не удалось проверить сессию. Повторите попытку.");
+      throw Error(
+        "Не удалось проверить вход. Проверьте соединение и попробуйте снова.",
+      );
     if ((await profile.json()).data.id !== userId) {
       removeSaved();
       window.location.replace("/events");
@@ -325,7 +375,9 @@ export function CreateEventScreen({
       throw Error("Войдите снова, чтобы продолжить.");
     }
     if (!response.ok)
-      throw Error("Не удалось проверить сессию. Повторите попытку.");
+      throw Error(
+        "Не удалось проверить вход. Проверьте соединение и попробуйте снова.",
+      );
     return (await response.json()).data.csrfToken as string;
   }
   async function upload(file: File | undefined) {
@@ -417,9 +469,7 @@ export function CreateEventScreen({
           ];
         }
         setFieldErrors(errors);
-        form.current
-          ?.querySelector<HTMLElement>(`[name="${Object.keys(errors)[0]}"]`)
-          ?.focus();
+        focusField(Object.keys(errors)[0]);
         return;
       }
       current = { key: crypto.randomUUID(), payload: parsed.data };
@@ -495,9 +545,7 @@ export function CreateEventScreen({
             ? { eventDate: [result.error.message] }
             : {});
         setFieldErrors(errors);
-        form.current
-          ?.querySelector<HTMLElement>(`[name="${Object.keys(errors)[0]}"]`)
-          ?.focus();
+        focusField(Object.keys(errors)[0]);
         throw Error(
           result.error?.message ??
             "Не удалось сохранить событие. Повторите проверку.",
@@ -524,7 +572,7 @@ export function CreateEventScreen({
       setError(
         caught instanceof Error && caught.name === "Error"
           ? caught.message
-          : "Ответ не получен. Повторите проверку: отправленный запрос повторится с прежним ключом.",
+          : "Сохранение пока не подтверждено. Нажмите «Проверить сохранение»: повторная проверка не создаст дубликат.",
       );
     } finally {
       busy.current = false;
@@ -545,6 +593,24 @@ export function CreateEventScreen({
   const cover = fields.coverAssetId
     ? `/api/v1/media/${fields.coverAssetId}`
     : null;
+  const previewEvent = {
+    publicId: "preview",
+    title: fields.title || "Название события",
+    eventType: fields.eventType,
+    eventDate: fields.eventDate,
+    startTime: fields.startTime || null,
+    endTime: fields.endTime || null,
+    timezone: fields.timezone,
+    isPast: false,
+    venueName: fields.venueName || null,
+    address: fields.address || null,
+    directions: fields.directions || null,
+    description: fields.description || null,
+    dressCode: fields.dressCode || null,
+    coverUrl: cover || null,
+    routeUrl: null,
+    version: 0,
+  };
   return (
     <main className="shell event-shell">
       <TelegramBack onBack={leave} warnBeforeClose={dirty || !!attempt} />
@@ -585,9 +651,7 @@ export function CreateEventScreen({
               ) : (
                 <span aria-hidden="true">＋</span>
               )}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
+              <ImageFileInput
                 aria-label={
                   cover ? "Сменить обложку события" : "Добавить обложку события"
                 }
@@ -636,6 +700,13 @@ export function CreateEventScreen({
           ) : null}
         </>
       }
+      {locallySaved !== null && (
+        <p className="hint" role="status">
+          {locallySaved
+            ? "Черновик сохранён на этом устройстве на один час."
+            : "Черновик не удалось сохранить на устройстве. Пока страница открыта, ввод остаётся в форме."}
+        </p>
+      )}
       {!online && (
         <p role="status" className="notice">
           Нет соединения. Можно продолжать заполнять форму; отправка станет
@@ -646,6 +717,18 @@ export function CreateEventScreen({
         <p role="alert" className="notice error">
           {error}
         </p>
+      )}
+      {editing && error && (
+        <details className="panel">
+          <summary>Посмотреть и скопировать мой ввод</summary>
+          <textarea
+            aria-label="Мой несохранённый ввод"
+            readOnly
+            rows={12}
+            value={JSON.stringify(fields, null, 2)}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+        </details>
       )}
       {editing && error && (
         <button
@@ -689,8 +772,11 @@ export function CreateEventScreen({
       >
         <div className="form-panels">
           {groups.map((group, index) => (
-            <section className="panel" key={group.title}>
-              <h2>{group.title}</h2>
+            <FormSection
+              key={group.title}
+              required={index < 2}
+              title={group.title}
+            >
               {group.fields.map((field) => (
                 <div className="field" key={field.key}>
                   <div className="label-row">
@@ -776,38 +862,33 @@ export function CreateEventScreen({
                   </p>
                 </div>
               ))}
-              {index === 1 && (
+              {index === 2 && (
                 <p className="timezone">
                   Часовой пояс: {fields.timezone}. Время сохраняется в этом
                   часовом поясе.
                 </p>
               )}
-            </section>
+            </FormSection>
           ))}
         </div>
-        <aside className="panel event-preview">
-          <h2>Так увидят гости</h2>
-          <div className="event-cover portrait-cover">
-            {cover ? (
-              <Image unoptimized width={800} height={480} src={cover} alt="" />
-            ) : (
-              <span aria-hidden="true">♡</span>
-            )}
-          </div>
-          <h3>{fields.title || "Название события"}</h3>
-          <p>
-            {fields.eventDate
-              ? eventDateLabel(fields.eventDate)
-              : "Выберите дату"}
-            {fields.startTime ? " · " + fields.startTime : ""}
-          </p>
-          <p className="muted">
-            {fields.venueName || "Место можно добавить позже"}
-          </p>
+        <details className="panel event-preview">
+          <summary>Предпросмотр приглашения</summary>
+          <EventInformation event={previewEvent} part="summary" preview />
+          <section className="notice" aria-label="Образец блока ответа">
+            <h2>Вы придёте?</h2>
+            <p>Буду · Не буду · Пока не знаю</p>
+            <p className="hint">
+              Гости смогут ответить в приглашении после создания события.
+            </p>
+          </section>
+          <EventInformation event={previewEvent} part="address" preview />
+          <EventInformation event={previewEvent} part="details" preview />
           <p className="hint">
-            Предпросмотр сведений. Приглашения скоро появятся.
+            После создания отправьте гостям ссылку на приглашение. Обложка в
+            приглашении показана в широком формате: видна центральная часть
+            исходного фото 3:4.
           </p>
-        </aside>
+        </details>
       </form>
       <footer className="form-footer">
         <button

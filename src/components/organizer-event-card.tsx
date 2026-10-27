@@ -95,6 +95,7 @@ export function OrganizerEventCard({
         </div>
       )}
       <div className="organizer-card-copy">
+        {!e.coverUrl && badge && <p className="event-status">{badge}</p>}
         {detail ? (
           <h1 ref={headingRef} tabIndex={-1}>
             {e.title}
@@ -148,34 +149,25 @@ export function OrganizerEventCard({
           {summary}
         </Link>
       )}
-      <nav
-        className="organizer-card-actions"
-        aria-label={`Действия: ${e.title}`}
-      >
-        <Link href={`/events/${e.id}/wishlist`}>
-          <Icon kind="gift" />
-          Подарки
-        </Link>
-        <Link href={`/events/${e.id}/guests`}>
-          <Icon kind="guests" />
-          Гости
-        </Link>
-        {detail ? (
-          <button
-            type="button"
-            onClick={detail.refresh}
-            disabled={detail.pending}
-          >
-            <Icon kind="details" />
-            {detail.pending ? "Обновляем…" : "Обновить"}
-          </button>
-        ) : (
+      {!detail && (
+        <nav
+          className="organizer-card-actions"
+          aria-label={`Действия: ${e.title}`}
+        >
+          <Link href={`/events/${e.id}/wishlist`}>
+            <Icon kind="gift" />
+            Подарки
+          </Link>
+          <Link href={`/events/${e.id}/guests`}>
+            <Icon kind="guests" />
+            Гости
+          </Link>
           <Link href={`/events/${e.id}`}>
             <Icon kind="details" />
             Детали
           </Link>
-        )}
-      </nav>
+        </nav>
+      )}
     </article>
   );
 }

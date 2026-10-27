@@ -11,7 +11,7 @@ export function GiftImage({ gift }: { gift: Gift }) {
   const [failed, setFailed] = useState<string | null>(null),
     [retry, setRetry] = useState(0);
   return (
-    <div className="gift-picture">
+    <div className={`gift-picture${!gift.imageUrl ? " no-photo" : ""}`}>
       {gift.imageUrl && failed !== gift.imageUrl ? (
         <Image
           key={`${gift.imageUrl}:${retry}`}

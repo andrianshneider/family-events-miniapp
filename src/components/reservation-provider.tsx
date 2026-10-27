@@ -1,5 +1,5 @@
 "use client";
-import {failure,telemetryHeaders} from "@/lib/analytics/client";
+import { failure, telemetryHeaders } from "@/lib/analytics/client";
 import { reservationText } from "@/lib/reservation-copy";
 import {
   createContext,
@@ -294,7 +294,8 @@ export function ReservationProvider({
       );
       announceEventChange();
     } catch (e) {
-      if(op?.method==="POST")failure("gift_reserve",op.key,{kind:"public",id:publicId},e);
+      if (op?.method === "POST")
+        failure("gift_reserve", op.key, { kind: "public", id: publicId }, e);
       if (
         e instanceof WishlistError &&
         e.status < 500 &&
@@ -390,7 +391,7 @@ export function ReservationProvider({
     >
       {children}
       {error && (
-        <div className="shell error" role="alert">
+        <div className="reservation-notice notice error" role="alert">
           <p>{error}</p>
           <button
             className="secondary"
@@ -402,7 +403,7 @@ export function ReservationProvider({
         </div>
       )}
       {context?.sessionState === "lost" && (
-        <div className="shell notice">
+        <div className="reservation-notice notice">
           <p>
             {reservationText(
               "Гостевая сессия потеряна. Откройте приглашение на устройстве, где выбирали подарок. Восстановить бронь по имени нельзя.",
@@ -418,7 +419,7 @@ export function ReservationProvider({
         </div>
       )}
       {notice && (
-        <p className="shell notice" role="status">
+        <p className="reservation-notice notice" role="status">
           {notice}
         </p>
       )}

@@ -127,7 +127,8 @@ export function LoginScreen({
       <h1>Соберите близких вместе</h1>
       <p className="muted">
         Планируйте семейные праздники и встречи. Войдите через Telegram, чтобы
-        открыть свои события.
+        открыть свои события. В Telegram подтвердите вход, затем вернитесь в
+        приложение.
       </p>
       <a
         className="primary"
@@ -163,7 +164,10 @@ export function LoginScreen({
           Закрыть Mini App
         </button>
       )}
-      <p className="small muted">Ваши события доступны только вам.</p>
+      <p className="small muted">
+        Управлять событиями можете только вы. Гости увидят приглашение по
+        ссылке.
+      </p>
       <InstallHelp />
     </main>
   );

@@ -55,17 +55,52 @@ export function EventChangeScreen({
     venueName: "Место",
     address: "Адрес",
   };
+  function display(key: string, value: unknown) {
+    if (!value) return "Не указано";
+    if (key === "eventDate" && /^\d{4}-\d{2}-\d{2}$/.test(String(value)))
+      return new Intl.DateTimeFormat("ru", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "UTC",
+      }).format(new Date(String(value) + "T12:00:00Z"));
+    if (key.endsWith("Time")) return String(value).slice(0, 5);
+    if (key === "timezone") {
+      try {
+        const name = new Intl.DateTimeFormat("ru", {
+          timeZone: String(value),
+          timeZoneName: "longGeneric",
+        })
+          .formatToParts(new Date())
+          .find((part) => part.type === "timeZoneName")?.value;
+        return `${name || String(value)} (${String(value)})`;
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  }
   return (
-    <main className="shell">
-      <Link href={`/events/${eventId}`}>← К событию</Link>
+    <main className="shell event-shell">
+      <header className="top">
+        <div className="brand">
+          <span aria-hidden="true">♡</span>Family Events
+        </div>
+      </header>
+      <Link className="text-button back" href={`/events/${eventId}`}>
+        ← К событию
+      </Link>
       <h1>Изменения сохранены</h1>
       <p>{title}</p>
       <section className="panel" aria-busy={busy}>
         <h2>Отправить уведомление гостям?</h2>
         {Object.entries(changes).map(([k, v]) => (
           <p key={k}>
-            {names[k] ?? k}: {String(v.before ?? "не указано")} →{" "}
-            {String(v.after ?? "не указано")}
+            <strong>{names[k] ?? k}</strong>
+            <br />
+            Было: {display(k, v.before)}
+            <br />
+            Стало: {display(k, v.after)}
           </p>
         ))}
         {error && <p role="alert">{error}</p>}
@@ -83,7 +118,11 @@ export function EventChangeScreen({
               disabled={busy}
               onClick={() => void save("send")}
             >
-              {attempt ? "Повторить решение" : "Отправить"}
+              {busy
+                ? "Сохраняем решение…"
+                : attempt
+                  ? "Проверить результат"
+                  : "Отправить уведомление"}
             </button>
             {!attempt && (
               <button
@@ -97,6 +136,11 @@ export function EventChangeScreen({
           </>
         )}
       </section>
+      {done && (
+        <Link className="primary route-link" href={`/events/${eventId}`}>
+          К событию
+        </Link>
+      )}
     </main>
   );
 }

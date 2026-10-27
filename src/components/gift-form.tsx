@@ -1,4 +1,5 @@
 "use client";
+import { ImageFileInput } from "./image-file-input";
 import { wishlistText } from "@/lib/wishlist-copy";
 
 import Image from "next/image";
@@ -217,11 +218,15 @@ export function GiftForm({
           )}
         </p>
       )}
+      <p className="hint">
+        Обязательно только название. Остальные поля можно заполнить позже.
+      </p>
       <fieldset disabled={disabled} className="gift-fields">
         <label className="field">
-          {wishlistText("Название")}
+          {wishlistText("Название")} *
           <input
             name="title"
+            required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             aria-invalid={Boolean(errors.title)}
@@ -234,9 +239,7 @@ export function GiftForm({
         </label>
         <label className="field">
           {wishlistText("Фото")}
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
+          <ImageFileInput
             onChange={(e) => choose(e.target.files?.[0])}
           />
           <span className="hint">

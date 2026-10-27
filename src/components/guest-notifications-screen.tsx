@@ -188,8 +188,18 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
     });
   }
   return (
-    <main className="shell organizer-notifications" aria-busy={busy}>
-      <Link href={`/e/${publicId}`}>← К событию</Link>
+    <main
+      className="shell event-shell organizer-notifications"
+      aria-busy={busy}
+    >
+      <header className="top">
+        <div className="brand">
+          <span aria-hidden="true">♡</span>Family Events
+        </div>
+      </header>
+      <Link className="text-button back" href={`/e/${publicId}`}>
+        ← К событию
+      </Link>
       <h1>Уведомления в Telegram</h1>
       {data && <p>{data.eventTitle}</p>}
       {error && (
@@ -209,7 +219,7 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
               ? "Подключение пока недоступно. Ваш ответ и подарки сохранены."
               : "Проверяем подключение…"}
           </p>
-          <button onClick={() => void load()}>Повторить</button>
+          <button className="secondary" disabled={busy} onClick={() => void load()}>Повторить</button>
         </>
       ) : (
         <>
@@ -255,9 +265,10 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
                 {data.accountConflict && (
                   <div role="alert">
                     <p>
-                      В браузере выполнен вход в другой аккаунт Organizer. Чтобы
-                      подключить выбранный гостевой аккаунт, выйдите из
-                      Organizer на этом устройстве. Ответ и подарки сохранятся.
+                      В браузере выполнен вход в другой аккаунт организатора.
+                      Чтобы подключить выбранный гостевой аккаунт, выйдите из
+                      организатора на этом устройстве. Ответ и подарки
+                      сохранятся.
                     </p>
                     <button
                       className="secondary"
@@ -273,7 +284,7 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
                         })
                       }
                     >
-                      Выйти из Organizer и продолжить гостем
+                      Выйти из организатора и продолжить гостем
                     </button>
                   </div>
                 )}
@@ -384,8 +395,8 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
                   Открыть Telegram
                 </a>
                 <p>
-                  Нажмите «Запустить» у бота, затем вернитесь сюда и подтвердите
-                  аккаунт.
+                  Откройте бота → Запустите → Вернитесь. Затем подтвердите
+                  аккаунт на этом экране.
                 </p>
               </>
             )}

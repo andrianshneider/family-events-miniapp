@@ -1,5 +1,5 @@
 "use client";
-import {useAnalyticsError,useAnalyticsView} from "@/lib/analytics/client";
+import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import { wishlistText } from "@/lib/wishlist-copy";
 
 import { useEffect, useRef, useState } from "react";
@@ -49,8 +49,20 @@ export function WishlistScreen({
     [deleteConflict, setDeleteConflict] = useState(false),
     [formUncertain, setFormUncertain] = useState(false);
   const screen = useRef<HTMLElement>(null);
-  useAnalyticsError("wishlist_view",unavailable||!!error&&!data,{kind:owner?"management":"public",id:eventKey});
-  const analyticsPreview=useAnalyticsView("wishlist_viewed",{kind:owner?"management":"public",id:eventKey},{surface:owner?"management":preview?"preview":"full",is_empty:data?.total===0},!!data&&!unavailable,preview);
+  useAnalyticsError("wishlist_view", unavailable || (!!error && !data), {
+    kind: owner ? "management" : "public",
+    id: eventKey,
+  });
+  const analyticsPreview = useAnalyticsView(
+    "wishlist_viewed",
+    { kind: owner ? "management" : "public", id: eventKey },
+    {
+      surface: owner ? "management" : preview ? "preview" : "full",
+      is_empty: data?.total === 0,
+    },
+    !!data && !unavailable,
+    preview,
+  );
   const dialog = useRef<HTMLDialogElement>(null),
     origin = useRef<HTMLElement | null>(null),
     locking = useRef(false);
@@ -232,7 +244,6 @@ export function WishlistScreen({
       )}
       {owner && data && (
         <section className="panel wishlist-settings">
-          <h2>{wishlistText("Режим сюрприза")}</h2>
           <label className="surprise-switch">
             <input
               type="checkbox"
@@ -247,13 +258,7 @@ export function WishlistScreen({
           <p className="hint" id="surprise-help">
             {wishlistText("Вы увидите, что подарок выбран, но не узнаете кем.")}
           </p>
-          <p>
-            {busy
-              ? wishlistText("Сохраняем…")
-              : data.hideReserverIdentity
-                ? wishlistText("Режим сюрприза включён.")
-                : wishlistText("Имена выбравших подарки доступны вам.")}
-          </p>
+          {busy && <p role="status">{wishlistText("Сохраняем…")}</p>}
         </section>
       )}
       {data && owner && (
@@ -300,7 +305,7 @@ export function WishlistScreen({
                         {wishlistText("Редактировать")}
                       </button>
                       <button
-                        className="secondary danger"
+                        className="text-button"
                         disabled={disabled}
                         aria-label={wishlistText("Удалить подарок: {0}", [
                           g.title,
@@ -360,7 +365,11 @@ export function WishlistScreen({
     </>
   );
   if (preview)
-    return <section ref={analyticsPreview} className="panel wishlist-preview">{content}</section>;
+    return (
+      <section ref={analyticsPreview} className="panel wishlist-preview">
+        {content}
+      </section>
+    );
   return (
     <main ref={screen} className="shell event-shell wishlist-shell">
       <TelegramBack

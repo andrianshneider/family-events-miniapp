@@ -1,7 +1,14 @@
+import { adultsCount, childrenCount, peopleCount } from "@/lib/russian-count";
 import type { Summary } from "@/lib/rsvp";
 export function GuestSummary({ summary }: { summary: Summary }) {
   return (
     <section className="guest-summary" aria-label="Ответы гостей">
+      <p>
+        <strong>
+          Ожидаем{" "}
+          {peopleCount(summary.confirmed.adults + summary.confirmed.children)}
+        </strong>
+      </p>
       <div className="response-summary">
         <p>
           <strong>{summary.responses.yes}</strong>
@@ -17,8 +24,8 @@ export function GuestSummary({ summary }: { summary: Summary }) {
         </p>
       </div>
       <p>
-        Подтвердили: {summary.confirmed.adults} взрослых ·{" "}
-        {summary.confirmed.children} детей
+        Подтвердили: {adultsCount(summary.confirmed.adults)} ·{" "}
+        {childrenCount(summary.confirmed.children)}
       </p>
       <p className="hint">Всего ответов: {summary.responses.total}</p>
     </section>

@@ -33,3 +33,14 @@ export type Guests = {
   nextCursor: string | null;
   filter: RsvpStatus | null;
 };
+
+export function guestListPath(
+  eventId: string,
+  status: RsvpStatus | null,
+  fromEvents = false,
+) {
+  const query = new URLSearchParams();
+  if (status) query.set("status", status);
+  if (fromEvents) query.set("from", "events");
+  return `/events/${eventId}/guests${query.size ? "?" + query.toString() : ""}`;
+}

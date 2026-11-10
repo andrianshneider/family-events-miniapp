@@ -158,7 +158,7 @@ export function OrganizerEventCard({
             <Icon kind="gift" />
             Подарки
           </Link>
-          <Link href={`/events/${e.id}/guests`}>
+          <Link href={`/events/${e.id}/guests?from=events`}>
             <Icon kind="guests" />
             Гости
           </Link>

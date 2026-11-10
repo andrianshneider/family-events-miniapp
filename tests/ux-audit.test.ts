@@ -1,3 +1,5 @@
+import { GuestListScreen } from "@/components/guest-list-screen";
+import { guestListPath, type Guests } from "@/lib/rsvp";
 import { WishlistScreen } from "@/components/wishlist-screen";
 import { it, expect } from "vitest";
 import { createElement } from "react";
@@ -129,4 +131,35 @@ it("returns from gifts to the explicit source while keeping event and guest defa
   );
   expect(guest).toContain('href="/e/test"');
   expect(guest).not.toContain('href="/events"');
+});
+
+it("returns from guests to event list and retains the origin in filter/login URLs", () => {
+  const initial: Guests = {
+    revision: "1",
+    event: { id: "test", title: "Встреча", eventDate: "2027-11-07" },
+    summary: {
+      responses: { yes: 0, no: 0, maybe: 0, total: 0 },
+      confirmed: { adults: 0, children: 0 },
+    },
+    guests: [],
+    nextCursor: null,
+    filter: null,
+  };
+  const fromList = renderToString(
+    createElement(GuestListScreen, { initial, backToEvents: true }),
+  );
+  expect(fromList).toContain('href="/events"');
+  expect(fromList).toContain("← Мои события");
+  const fromEvent = renderToString(createElement(GuestListScreen, { initial }));
+  expect(fromEvent).toContain('href="/events/test"');
+  expect(fromEvent).toContain("← К событию");
+  for (const status of [null, "yes", "no", "maybe"] as const) {
+    const url = new URL(
+      guestListPath("test", status, true),
+      "https://example.test",
+    );
+    expect(url.searchParams.get("from")).toBe("events");
+    expect(url.searchParams.get("status")).toBe(status);
+  }
+  expect(guestListPath("test", null)).toBe("/events/test/guests");
 });

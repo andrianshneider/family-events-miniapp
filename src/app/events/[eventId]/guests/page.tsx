@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { organizer } from "@/server/auth/sessions";
 import { eventGuests } from "@/server/services/guests";
 import { AppError } from "@/server/errors";
+import { guestListPath } from "@/lib/rsvp";
 import { GuestListScreen } from "@/components/guest-list-screen";
 export const dynamic = "force-dynamic";
 export default async function GuestsPage({
@@ -10,14 +11,16 @@ export default async function GuestsPage({
   searchParams,
 }: {
   params: Promise<{ eventId: string }>;
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; from?: string | string[] }>;
 }) {
   const parsed = z.uuid().safeParse((await params).eventId);
   if (!parsed.success) notFound();
+  const query = await searchParams;
+  const backToEvents = query.from === "events";
   const status = z
     .enum(["yes", "no", "maybe"])
     .optional()
-    .safeParse((await searchParams).status);
+    .safeParse(query.status);
   if (!status.success) notFound();
   let initial;
   try {
@@ -29,7 +32,7 @@ export default async function GuestsPage({
       redirect(
         "/login?returnTo=" +
           encodeURIComponent(
-            `/events/${parsed.data}/guests${status.data ? "?status=" + status.data : ""}`,
+            guestListPath(parsed.data, status.data ?? null, backToEvents),
           ),
       );
     if (error instanceof AppError && error.status === 404) notFound();
@@ -39,6 +42,7 @@ export default async function GuestsPage({
     <GuestListScreen
       key={`${parsed.data}:${status.data ?? "all"}`}
       initial={initial}
+      backToEvents={backToEvents}
     />
   );
 }

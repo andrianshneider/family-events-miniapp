@@ -2,13 +2,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Guests, RsvpStatus } from "@/lib/rsvp";
+import { guestListPath, type Guests, type RsvpStatus } from "@/lib/rsvp";
 import { watchEventChanges } from "@/lib/event-updates";
 import { GuestSummary } from "./guest-summary";
 import { GuestCard } from "./guest-card";
 import { TelegramBack } from "./telegram-back";
 import { eventDateLabel } from "./event-presentation";
-export function GuestListScreen({ initial }: { initial: Guests }) {
+export function GuestListScreen({
+  initial,
+  backToEvents = false,
+}: {
+  initial: Guests;
+  backToEvents?: boolean;
+}) {
+  const back = backToEvents ? "/events" : `/events/${initial.event.id}`;
   const router = useRouter();
   const [data, setData] = useState<Guests | null>(initial),
     [filter, setFilter] = useState(initial.filter),
@@ -49,7 +56,7 @@ export function GuestListScreen({ initial }: { initial: Guests }) {
         window.location.replace(
           "/login?returnTo=" +
             encodeURIComponent(
-              `/events/${initial.event.id}/guests${active ? "?status=" + active : ""}`,
+              guestListPath(initial.event.id, active, backToEvents),
             ),
         );
         return;
@@ -105,7 +112,7 @@ export function GuestListScreen({ initial }: { initial: Guests }) {
         queueMicrotask(() => void load());
       }
     }
-  }, [api, initial.event.id]);
+  }, [api, initial.event.id, backToEvents]);
   useEffect(() => {
     const network = () => setOffline(!navigator.onLine);
     network();
@@ -139,7 +146,7 @@ export function GuestListScreen({ initial }: { initial: Guests }) {
     setFilter(status);
     generation.current++;
     next.current = null;
-    const path = `/events/${initial.event.id}/guests${status ? "?status=" + status : ""}`;
+    const path = guestListPath(initial.event.id, status, backToEvents);
     window.history.replaceState(null, "", path);
     if (!navigator.onLine) return;
     void load();
@@ -165,7 +172,12 @@ export function GuestListScreen({ initial }: { initial: Guests }) {
         next.current = null;
         requested.current = false;
         setData(null);
-        window.location.replace("/login");
+        window.location.replace(
+          "/login?returnTo=" +
+            encodeURIComponent(
+              guestListPath(initial.event.id, active, backToEvents),
+            ),
+        );
         return;
       }
       if (response.status === 404) {
@@ -228,14 +240,14 @@ export function GuestListScreen({ initial }: { initial: Guests }) {
     data?.guests.filter((guest) => !filter || guest.status === filter) ?? [];
   return (
     <main className="shell event-shell guests-shell">
-      <TelegramBack onBack={() => router.push(`/events/${initial.event.id}`)} />
+      <TelegramBack onBack={() => router.push(back)} />
       <header className="top">
         <div className="brand">
           <span aria-hidden="true">♡</span>Family Events
         </div>
       </header>
-      <Link className="text-button back" href={`/events/${initial.event.id}`}>
-        ← К событию
+      <Link className="text-button back" href={back}>
+        {backToEvents ? "← Мои события" : "← К событию"}
       </Link>
       {unavailable ? (
         <>

@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { capture, failure, clientPlatform } from "@/lib/analytics/client";
 import Link from "next/link";
 import Image from "next/image";
@@ -238,9 +239,7 @@ export function ShareEventScreen({
     <main className="shell event-shell share-shell">
       <TelegramBack onBack={() => router.push(`/events/${eventId}`)} />
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       <Link className="text-button back" href={`/events/${eventId}`}>
         ← К событию
@@ -347,7 +346,13 @@ export function ShareEventScreen({
                       alt={`Обложка события «${data.event.title}»`}
                     />
                   ) : (
-                    <span aria-hidden="true">♡</span>
+                    <Image
+                      unoptimized
+                      src="/icons/meetmallow-192.png"
+                      width={48}
+                      height={48}
+                      alt=""
+                    />
                   )}
                 </div>
               )}

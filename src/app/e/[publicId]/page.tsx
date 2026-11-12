@@ -17,7 +17,7 @@ export async function generateMetadata({
     const event = await publicPageEvent(publicId);
     const url = canonicalEventUrl(publicId);
     const image = new URL(
-      `/api/v1/public/events/${publicId}/og?v=${event.version}`,
+      `/api/v1/public/events/${publicId}/og?v=${event.version}&brand=meetmallow`,
       url,
     ).toString();
     return {
@@ -27,6 +27,7 @@ export async function generateMetadata({
       alternates: { canonical: url },
       openGraph: {
         type: "website",
+        siteName: "Meetmallow",
         url,
         title: event.title,
         description: eventWhen(event),
@@ -68,7 +69,11 @@ export default async function PublicPage({
     throw error;
   }
   let wishlist = null;
-  try { wishlist = await readWishlist(event.publicId, {limit:3}); } catch(error) { if(error instanceof AppError && error.status===404) notFound(); }
+  try {
+    wishlist = await readWishlist(event.publicId, { limit: 3 });
+  } catch (error) {
+    if (error instanceof AppError && error.status === 404) notFound();
+  }
   return (
     <PublicEventScreen
       key={`${event.publicId}:${event.version}`}

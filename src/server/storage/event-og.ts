@@ -1,5 +1,7 @@
 import "server-only";
 import sharp from "sharp";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { publicEvent } from "../services/public-events";
 import { eventWhen } from "@/lib/invitation";
 import { eventCover } from "./media";
@@ -53,7 +55,7 @@ export async function eventOg(publicId: string) {
         `<text x="64" y="${200 + i * 64}" font-size="${Math.min(50, Math.floor(632 / ([...line].length * 0.95)))}" font-weight="700">${xml(line)}</text>`,
     )
     .join("");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="${cover ? 760 : 1200}" height="630" fill="#fffdfb"/><g font-family="Arial, sans-serif" fill="#292433"><text x="64" y="90" font-size="28" fill="#7952c7" font-weight="700">Family Events</text>${title}<text x="64" y="530" font-size="27">${xml(eventWhen(event))}</text><text x="64" y="578" font-size="22" fill="#716879">Время события · ${xml(event.timezone)}</text></g>${cover ? "" : '<rect x="866" y="166" width="230" height="230" rx="48" fill="#f5efff"/><path d="M980 335 C920 292 915 245 950 237 C969 233 980 246 980 251 C980 246 995 231 1013 237 C1050 248 1040 290 980 335Z" fill="none" stroke="#7952c7" stroke-width="5"/>'}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="${cover ? 760 : 1200}" height="630" fill="#fffdfb"/><g font-family="Arial, sans-serif" fill="#292433"><text x="128" y="86" font-size="28" fill="#7952c7" font-weight="700">Meetmallow</text>${title}<text x="64" y="530" font-size="27">${xml(eventWhen(event))}</text><text x="64" y="578" font-size="22" fill="#716879">Время события · ${xml(event.timezone)}</text></g></svg>`;
   const background = cover
     ? sharp(cover)
     : sharp({
@@ -64,8 +66,19 @@ export async function eventOg(publicId: string) {
           background: "#fffdfb",
         },
       });
+  const mark = await readFile(
+    join(process.cwd(), "public/icons/meetmallow-512.png"),
+  );
+  const headerMark = await sharp(mark).resize(48, 48).png().toBuffer();
+  const fallbackMark = cover
+    ? null
+    : await sharp(mark).resize(230, 230).png().toBuffer();
   return background
-    .composite([{ input: Buffer.from(svg) }])
+    .composite([
+      { input: Buffer.from(svg) },
+      { input: headerMark, left: 64, top: 50 },
+      ...(fallbackMark ? [{ input: fallbackMark, left: 866, top: 166 }] : []),
+    ])
     .png()
     .toBuffer();
 }

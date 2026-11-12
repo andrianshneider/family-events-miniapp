@@ -1678,3 +1678,9 @@ summary:focus-visible {
 .gift-import-prompt > p:first-child { margin:0 0 8px; font-weight:600; }
 .gift-import-actions { display:flex; flex-wrap:wrap; gap:8px; }
 .gift-import-actions button { min-height:44px; }
+
+/* Shared approved branding, independent of the historical heart-mark styles. */
+.brand .brand-icon { display:block; width:48px; height:48px; flex:0 0 48px; border-radius:12px; object-fit:cover; }
+.brand .brand-name { padding:0; background:none; color:inherit; font-size:inherit; border-radius:0; }
+@media (max-width:360px) { .brand { gap:8px; } .brand .brand-icon { width:40px; height:40px; flex-basis:40px; border-radius:10px; } }
+.event-shell .brand .brand-name { font-size:inherit; padding:0; border-radius:0; }

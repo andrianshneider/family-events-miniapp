@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -193,9 +194,7 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
       aria-busy={busy}
     >
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       <Link className="text-button back" href={`/e/${publicId}`}>
         ← К событию
@@ -219,7 +218,13 @@ export function GuestNotificationsScreen({ publicId }: { publicId: string }) {
               ? "Подключение пока недоступно. Ваш ответ и подарки сохранены."
               : "Проверяем подключение…"}
           </p>
-          <button className="secondary" disabled={busy} onClick={() => void load()}>Повторить</button>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => void load()}
+          >
+            Повторить
+          </button>
         </>
       ) : (
         <>

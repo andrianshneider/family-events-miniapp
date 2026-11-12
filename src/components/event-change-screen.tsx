@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import Link from "next/link";
 import { useState } from "react";
 import { organizerMutation } from "@/lib/wishlist-client";
@@ -83,9 +84,7 @@ export function EventChangeScreen({
   return (
     <main className="shell event-shell">
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       <Link className="text-button back" href={`/events/${eventId}`}>
         ← К событию

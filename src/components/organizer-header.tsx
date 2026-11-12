@@ -1,3 +1,4 @@
+import { Brand } from "@/components/brand";
 export function OrganizerHeader({ displayName }: { displayName: string }) {
   const initials = displayName
     .trim()
@@ -8,9 +9,7 @@ export function OrganizerHeader({ displayName }: { displayName: string }) {
     .toUpperCase();
   return (
     <header className="top">
-      <div className="brand">
-        <span aria-hidden="true">♡</span> Family Events
-      </div>
+      <Brand />
       <span
         className="organizer-avatar"
         title={displayName}

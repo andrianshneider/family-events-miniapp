@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import { wishlistText } from "@/lib/wishlist-copy";
 
@@ -383,9 +384,7 @@ export function WishlistScreen({
         }}
       />
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       {content}
       <dialog

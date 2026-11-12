@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { reservationText } from "@/lib/reservation-copy";
 import { wishlistText } from "@/lib/wishlist-copy";
 
@@ -96,9 +97,7 @@ export function GiftDetailScreen({
         }}
       />
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       <Link className="text-button back" href={`/e/${publicId}/wishlist`}>
         {wishlistText("← К wishlist")}

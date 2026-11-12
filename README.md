@@ -1,4 +1,6 @@
-# Family Events OS — server foundation
+# Meetmallow
+
+Formerly Family Events OS. Telegram Mini App, Web and PWA for organizing gatherings.
 
 Existing repository: https://github.com/andrianshneider/family-events-miniapp
 
@@ -6,7 +8,11 @@ One Next.js 16.4 / React / strict TypeScript application for Telegram Mini App, 
 
 ## Scope
 
-Foundation: private PostgreSQL schema, sessions, Telegram verification/OIDC, DAL/transaction helpers, validation, Storage upload completion, notification worker, encrypted webhook inbox and CI. No product vertical slice is presented as complete. Existing root HTML and assets remain intact. `public/` contains unchanged copies of approved demo screens. `/` opens the existing login mockup; `/events` requires Organizer authentication but its target screen is still a demo. Its simulated login/data are not real credentials or database operations. Wiring these screens is Vertical Slice 01.
+Implemented slices: verified Telegram Mini App/OIDC login, server sessions, Organizer event creation/editing/soft delete, public invitations and sharing, RSVP, wishlist and gift reservations, Organizer/Guest Telegram notifications, PWA installation and privacy-preserving analytics. Gift forms can import title, price and photo from a product link after confirmation. The live application uses real protected API/DB/Storage data; root HTML and the static demo screens in `public/` remain historical design references.
+
+Approved branding: Meetmallow with the orange embracing-marshmallows icon. See [brand assets](assets/brand/README.md). Infrastructure identifiers, repository URLs, Telegram bot username and session keys retain their existing names to preserve integrations and account identity.
+
+Development/staging remains on `infrastructure-foundation`. Changes may be merged to `main` for the GitHub source release; automatic Vercel deployments from `main` are explicitly disabled in `vercel.json`. Production publication is a separate action.
 
 ## Local setup
 

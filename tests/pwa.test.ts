@@ -7,6 +7,8 @@ import { iphoneSafari, standalone } from "@/lib/pwa";
 it("uses stable app identity, scoped routes and real safe-area icons", async () => {
   const app = manifest();
   expect(app).toMatchObject({
+    name: "Meetmallow",
+    short_name: "Meetmallow",
     id: "/",
     start_url: "/",
     scope: "/",
@@ -27,7 +29,7 @@ it("uses stable app identity, scoped routes and real safe-area icons", async () 
     for (let x = 0; x < info.width; x++) {
       if (Math.hypot(x - 255.5, y - 255.5) <= 205) continue;
       const i = (y * info.width + x) * info.channels;
-      expect([data[i], data[i + 1], data[i + 2]]).toEqual([126, 80, 197]);
+      expect([data[i], data[i + 1], data[i + 2]]).toEqual([255, 106, 0]);
     }
 });
 it("recognizes installed modes and restricts iPhone instructions to Safari including desktop-UA iPad", () => {

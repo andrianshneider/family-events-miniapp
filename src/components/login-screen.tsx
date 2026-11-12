@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import {
   failure,
   telemetryHeaders,
@@ -121,9 +122,7 @@ export function LoginScreen({
           setSdkReady(true);
         }}
       />
-      <div className="brand">
-        <span aria-hidden="true">♡</span> Family Events
-      </div>
+      <Brand />
       <h1>Соберите близких вместе</h1>
       <p className="muted">
         Планируйте семейные праздники и встречи. Войдите через Telegram, чтобы

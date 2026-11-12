@@ -1,27 +1,27 @@
 import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Family Events",
-    short_name: "Family Events",
+    name: "Meetmallow",
+    short_name: "Meetmallow",
     id: "/",
     start_url: "/",
     scope: "/",
     description: "Семейные праздники и встречи",
     icons: [
       {
-        src: "/icons/icon-192.png",
+        src: "/icons/meetmallow-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/icon-512.png",
+        src: "/icons/meetmallow-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/icon-maskable-512.png",
+        src: "/icons/meetmallow-maskable-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

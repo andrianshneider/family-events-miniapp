@@ -4,7 +4,7 @@ import { GuestNotificationsScreen } from "@/components/guest-notifications-scree
 import { publicEvent } from "@/server/services/public-events";
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Уведомления в Telegram — Family Events",
+  title: "Уведомления в Telegram — Meetmallow",
   robots: { index: false, follow: false },
 };
 export default async function Page({

@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -242,9 +243,7 @@ export function GuestListScreen({
     <main className="shell event-shell guests-shell">
       <TelegramBack onBack={() => router.push(back)} />
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       <Link className="text-button back" href={back}>
         {backToEvents ? "← Мои события" : "← К событию"}

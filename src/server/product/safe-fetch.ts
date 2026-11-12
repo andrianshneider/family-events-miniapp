@@ -70,7 +70,7 @@ export async function fetchProductResource(
         {
           agent: false,
           headers: {
-            "User-Agent": "FamilyEvents/1.0 (product preview)",
+            "User-Agent": "Meetmallow/1.0 (product preview)",
             Accept:
               kind === "html"
                 ? "text/html,application/xhtml+xml"

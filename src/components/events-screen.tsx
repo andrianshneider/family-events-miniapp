@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { resetClientAnalytics } from "@/lib/analytics/client";
 import { watchEventChanges } from "@/lib/event-updates";
 import { InstallHelp } from "./install-help";
@@ -270,9 +271,7 @@ export function EventsScreen({
             : ""}
       </div>
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span> Family Events
-        </div>
+        <Brand />
         <button className="text-button" onClick={logout} disabled={loggingOut}>
           {loggingOut ? "Выходим…" : "Выйти"}
         </button>

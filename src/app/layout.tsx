@@ -1,23 +1,23 @@
-import {AnalyticsProvider} from "@/components/analytics-provider";
-import {enabled} from "@/server/analytics/journal";
+import { AnalyticsProvider } from "@/components/analytics-provider";
+import { enabled } from "@/server/analytics/journal";
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { PwaProvider } from "@/components/pwa-provider";
 export const metadata: Metadata = {
-  title: "Family Events",
-  applicationName: "Family Events",
+  title: "Meetmallow",
+  applicationName: "Meetmallow",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Family Events",
+    title: "Meetmallow",
     statusBarStyle: "default",
   },
   icons: {
     apple: [
-      { url: "/icons/icon-180.png", sizes: "180x180", type: "image/png" },
+      { url: "/icons/meetmallow-180.png", sizes: "180x180", type: "image/png" },
     ],
-    icon: "/icons/icon-192.png",
+    icon: "/icons/meetmallow-192.png",
   },
   robots: { index: false, follow: false },
 };
@@ -37,7 +37,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
       </head>
       <body>
-        <AnalyticsProvider enabled={enabled()}><PwaProvider>{children}</PwaProvider></AnalyticsProvider>
+        <AnalyticsProvider enabled={enabled()}>
+          <PwaProvider>{children}</PwaProvider>
+        </AnalyticsProvider>
       </body>
     </html>
   );

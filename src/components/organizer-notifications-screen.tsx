@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { notificationText } from "@/lib/organizer-notifications-copy";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -215,9 +216,7 @@ export function OrganizerNotificationsScreen({
         }}
       />
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       <Link className="text-button back" href={`/events/${eventId}`}>
         {notificationText("← К событию")}

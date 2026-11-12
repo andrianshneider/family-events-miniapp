@@ -3,7 +3,9 @@ const config: NextConfig = {
   poweredByHeader: false,
   // Public invitation metadata must be present in initial HTML for all link previews.
   htmlLimitedBots: /.*/,
-  outputFileTracingIncludes: { "/*": ["./certs/*.crt"] },
+  outputFileTracingIncludes: {
+    "/*": ["./certs/*.crt", "./public/icons/meetmallow-512.png"],
+  },
   async redirects() {
     return [
       {

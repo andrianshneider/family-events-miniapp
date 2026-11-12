@@ -221,7 +221,7 @@ try {
   assert.equal(worker.status, 200);
   assert(worker.headers.get("cache-control")?.includes("no-store"));
   assert.equal(worker.headers.get("service-worker-allowed"), "/");
-  assert((await worker.text()).includes("family-events-offline-v1"));
+  assert((await worker.text()).includes("meetmallow-offline-v1"));
   const offline = await request("/offline.html");
   assert.equal(offline.status, 200);
   assert((await offline.text()).includes("Нет подключения"));

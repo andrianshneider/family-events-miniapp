@@ -4,10 +4,10 @@ export function InstallHelp() {
   const { prompt, ios, hidden, installing, error, install } = usePwa();
   if (hidden || (!ios && !prompt && !installing && !error)) return null;
   return (
-    <section className="install-help" aria-label="Установка Family Events">
+    <section className="install-help" aria-label="Установка Meetmallow">
       {(prompt || installing) && (
         <button className="secondary" onClick={install} disabled={installing}>
-          {installing ? "Открываем установку…" : "Установить Family Events"}
+          {installing ? "Открываем установку…" : "Установить Meetmallow"}
         </button>
       )}
       {error && <p role="alert">{error}</p>}
@@ -20,7 +20,7 @@ export function InstallHelp() {
               Если есть переключатель «Открывать как веб-приложение», включите
               его.
             </li>
-            <li>Нажмите «Добавить» и откройте Family Events с новой иконки.</li>
+            <li>Нажмите «Добавить» и откройте Meetmallow с новой иконки.</li>
           </ol>
           <p>
             При первом запуске может понадобиться снова войти через Telegram.

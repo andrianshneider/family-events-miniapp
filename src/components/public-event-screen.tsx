@@ -1,4 +1,5 @@
 "use client";
+import { Brand } from "@/components/brand";
 import { useAnalyticsError, useAnalyticsView } from "@/lib/analytics/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PublicEvent } from "@/lib/invitation";
@@ -95,9 +96,7 @@ export function PublicEventScreen({
   return (
     <main className="shell event-shell public-shell">
       <header className="top">
-        <div className="brand">
-          <span aria-hidden="true">♡</span>Family Events
-        </div>
+        <Brand />
       </header>
       {unavailable ? (
         <>
@@ -147,7 +146,11 @@ export function PublicEventScreen({
               />
             </div>
             <div className="public-details">
-              {(event.description || event.directions || event.dressCode) && <a className="text-button" href="#invitation-answer">Ответить на приглашение ↑</a>}
+              {(event.description || event.directions || event.dressCode) && (
+                <a className="text-button" href="#invitation-answer">
+                  Ответить на приглашение ↑
+                </a>
+              )}
               <EventInformation event={event} part="details" />
               {(event.description || event.directions || event.dressCode) && (
                 <a className="text-button" href="#invitation-answer">

@@ -7,7 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import { giftInput } from "@/lib/validation";
 import type { Gift } from "@/lib/wishlist";
 import { uploadGiftImage, type GiftUpload } from "@/lib/gift-upload";
-import { organizerMutation, WishlistError } from "@/lib/wishlist-client";
+import {
+  organizerMutation,
+  wishlistApi,
+  WishlistError,
+} from "@/lib/wishlist-client";
+import type { importProduct } from "@/server/product/import";
 type Fields = ReturnType<typeof giftInput.parse>;
 type Attempt = { key: string; body: unknown };
 export function GiftForm({
@@ -44,6 +49,110 @@ export function GiftForm({
   const busy = useRef(false),
     form = useRef<HTMLFormElement>(null),
     prepared = useRef<GiftUpload | null>(null);
+  const [offerUrl, setOfferUrl] = useState<string | null>(null);
+  const [autoPending, setAutoPending] = useState(false);
+  const [autoMessage, setAutoMessage] = useState("");
+  const lastOffered = useRef(gift?.externalUrl?.trim() ?? "");
+  const importRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => importRequest.current?.abort(), []);
+  useEffect(() => {
+    const candidate = url.trim();
+    if (candidate === lastOffered.current) return;
+    try {
+      const parsed = new URL(candidate);
+      if (
+        !["http:", "https:"].includes(parsed.protocol) ||
+        parsed.username ||
+        parsed.password
+      )
+        return;
+    } catch {
+      return;
+    }
+    const timer = setTimeout(() => {
+      lastOffered.current = candidate;
+      setOfferUrl(candidate);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [url]);
+  function changeUrl(value: string) {
+    setUrl(value);
+    if (!value.trim()) lastOffered.current = "";
+    setOfferUrl(null);
+    setAutoMessage("");
+  }
+  async function autofill() {
+    if (!offerUrl || busy.current || offline || conflict) return;
+    const controller = new AbortController();
+    importRequest.current = controller;
+    busy.current = true;
+    setAutoPending(true);
+    onBusy(true);
+    setError("");
+    setAutoMessage("");
+    try {
+      const csrf = await wishlistApi<{ csrfToken: string }>("/api/auth/csrf", {
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(10000),
+        ]),
+      });
+      const result = await wishlistApi<
+        Awaited<ReturnType<typeof importProduct>>
+      >(`/api/v1/events/${eventId}/gifts/import`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrf.csrfToken,
+        },
+        body: JSON.stringify({ url: offerUrl }),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(25000),
+        ]),
+      });
+      if (controller.signal.aborted) return;
+      if (result.title) setTitle(result.title);
+      if (result.amount && result.currency) {
+        setAmount(result.amount);
+        setCurrency(result.currency);
+      }
+      if (result.image) {
+        const bytes = Uint8Array.from(atob(result.image.data), (c) =>
+          c.charCodeAt(0),
+        );
+        choose(new File([bytes], "gift.webp", { type: result.image.mimeType }));
+      }
+      setErrors({});
+      setOfferUrl(null);
+      const missing = [
+        !result.title && "название",
+        !result.amount && "цену",
+        !result.image && "фото",
+      ].filter(Boolean);
+      setAutoMessage(
+        missing.length
+          ? `Данные получены. Не удалось получить ${missing.join(", ")}: прежние значения сохранены. Проверьте поля перед сохранением.`
+          : "Название, цена и фото заполнены. Проверьте данные и сохраните подарок.",
+      );
+    } catch (caught) {
+      if (controller.signal.aborted) return;
+      if (caught instanceof WishlistError && caught.status === 401) {
+        onAuth();
+        return;
+      }
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Не удалось заполнить подарок. Введите данные вручную.",
+      );
+    } finally {
+      busy.current = false;
+      setAutoPending(false);
+      onBusy(false);
+      importRequest.current = null;
+    }
+  }
   useEffect(() => {
     const change = () => setOffline(!navigator.onLine);
     change();
@@ -187,7 +296,7 @@ export function GiftForm({
       onBusy(false);
     }
   }
-  const disabled = pending || Boolean(attempt);
+  const disabled = pending || autoPending || Boolean(attempt);
   return (
     <form
       ref={form}
@@ -223,6 +332,62 @@ export function GiftForm({
       </p>
       <fieldset disabled={disabled} className="gift-fields">
         <label className="field">
+          {wishlistText("Ссылка")}
+          <input
+            name="externalUrl"
+            type="text"
+            inputMode="url"
+            value={url}
+            onChange={(e) => changeUrl(e.target.value)}
+            autoFocus
+            aria-invalid={Boolean(errors.externalUrl)}
+            aria-describedby="gift-url-error"
+          />
+          <span className="error" id="gift-url-error">
+            {errors.externalUrl}
+          </span>
+        </label>
+        {offerUrl && !autoPending && (
+          <section
+            className="gift-import-prompt"
+            aria-label="Автозаполнение подарка"
+          >
+            <p>Заполнить данные по ссылке?</p>
+            <p className="hint">
+              Найденные название, цена и фото заменят заполненные поля.
+              Комментарий сохранится. Подарок сохранится только после нажатия
+              кнопки внизу формы.
+            </p>
+            <div className="gift-import-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void autofill()}
+                disabled={offline || conflict}
+              >
+                Заполнить автоматически
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setOfferUrl(null)}
+              >
+                Не сейчас
+              </button>
+            </div>
+          </section>
+        )}
+        {autoPending && (
+          <p className="notice" role="status">
+            Получаем название, цену и фото…
+          </p>
+        )}
+        {autoMessage && (
+          <p className="notice" role="status">
+            {autoMessage}
+          </p>
+        )}
+        <label className="field">
           {wishlistText("Название")} *
           <input
             name="title"
@@ -231,7 +396,6 @@ export function GiftForm({
             onChange={(e) => setTitle(e.target.value)}
             aria-invalid={Boolean(errors.title)}
             aria-describedby="gift-title-error"
-            autoFocus
           />
           <span className="error" id="gift-title-error">
             {errors.title}
@@ -239,9 +403,7 @@ export function GiftForm({
         </label>
         <label className="field">
           {wishlistText("Фото")}
-          <ImageFileInput
-            onChange={(e) => choose(e.target.files?.[0])}
-          />
+          <ImageFileInput onChange={(e) => choose(e.target.files?.[0])} />
           <span className="hint">
             {wishlistText(
               "JPG/PNG/WebP, до 10 Мб и 20 мегапикселей. Проверим изображение на сервере.",
@@ -277,21 +439,6 @@ export function GiftForm({
             {errors.imageAssetId}
           </p>
         )}
-        <label className="field">
-          {wishlistText("Ссылка")}
-          <input
-            name="externalUrl"
-            type="text"
-            inputMode="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            aria-invalid={Boolean(errors.externalUrl)}
-            aria-describedby="gift-url-error"
-          />
-          <span className="error" id="gift-url-error">
-            {errors.externalUrl}
-          </span>
-        </label>
         <div className="gift-money">
           <label className="field">
             {wishlistText("Цена")}
@@ -337,7 +484,10 @@ export function GiftForm({
         </label>
       </fieldset>
       <div className="gift-dialog-actions">
-        <button className="primary" disabled={pending || offline || conflict}>
+        <button
+          className="primary"
+          disabled={pending || autoPending || offline || conflict}
+        >
           {pending
             ? wishlistText("Сохраняем…")
             : attempt
@@ -349,7 +499,7 @@ export function GiftForm({
         <button
           type="button"
           className="secondary"
-          disabled={pending}
+          disabled={pending || autoPending}
           onClick={onClose}
         >
           {wishlistText("Отмена")}

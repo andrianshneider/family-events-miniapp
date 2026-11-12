@@ -1673,3 +1673,8 @@ summary:focus-visible {
 .time-picker-trigger { flex-wrap:wrap; gap:4px; }
 
 .organizer-card-stats { color:#63596e; }
+
+.gift-import-prompt { padding:16px; border:1px solid #e6dfe9; border-radius:16px; background:#f8f5fc; }
+.gift-import-prompt > p:first-child { margin:0 0 8px; font-weight:600; }
+.gift-import-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.gift-import-actions button { min-height:44px; }

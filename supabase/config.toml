@@ -1,0 +1,14 @@
+project_id = "family-events"
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+[db]
+major_version = 17
+[storage]
+enabled = true
+file_size_limit = "10MiB"
+[storage.buckets.event-media]
+public = false
+file_size_limit = "10MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/webp"]

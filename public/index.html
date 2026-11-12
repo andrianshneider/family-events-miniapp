@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f4f7fc"><title>Family Events — Мои события</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231674ff'/%3E%3Ctext x='32' y='45' text-anchor='middle' font-size='42' fill='white'%3E%E2%99%A1%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script defer src="https://telegram.org/js/telegram-web-app.js?63"></script><script defer src="app.js"></script>
+</head><body><main class="app">
+<section id="login" class="login" hidden>
+<div class="brand"><span class="avatar">♡</span>Family Events</div>
+<div class="welcome"><p class="muted">Добро пожаловать</p><h1>Все важные события семьи — в одном месте</h1><p class="muted">Планируйте праздники, собирайте близких и сохраняйте идеи подарков.</p><div class="panel"><h2>Демо-режим</h2><p class="muted">В Telegram приложение покажет ваш профиль. Здесь можно попробовать прототип.</p><button class="primary" data-action="login">Посмотреть прототип</button></div></div>
+</section>
+<section id="home" hidden>
+<header class="top"><button class="brand" data-route="profile" aria-label="Открыть профиль"><span class="avatar" id="avatar">А</span><span>Family Events</span></button><div class="header-actions"><button class="icon-button" data-action="search" aria-label="Поиск событий" id="search-toggle"></button><button class="icon-button notifications" data-action="notifications" aria-label="Уведомления, 3 новых" id="notifications-toggle"></button></div></header>
+<div id="page" class="page"></div><nav class="bottom-nav" aria-label="Основная навигация"></nav>
+</section></main>
+<dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-heading"><h2 id="dialog-title"></h2><button class="icon-button" data-action="close" aria-label="Закрыть">×</button></div><div id="dialog-body"></div></dialog>
+<div id="toast" role="status" class="toast" hidden></div>
+</body></html>

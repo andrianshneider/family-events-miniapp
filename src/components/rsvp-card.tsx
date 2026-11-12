@@ -1,0 +1,846 @@
+"use client";
+import { adultsCount, childrenCount } from "@/lib/russian-count";
+import { capture, failure, telemetryHeaders } from "@/lib/analytics/client";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { PublicEvent } from "@/lib/invitation";
+import { rsvpLabels, type RsvpStatus, type GuestContext } from "@/lib/rsvp";
+import { rsvpInput } from "@/lib/validation";
+import { announceEventChange, watchEventChanges } from "@/lib/event-updates";
+import { TelegramBack } from "./telegram-back";
+import { eventDateLabel } from "./event-presentation";
+type Draft = {
+  guestName: string;
+  status: RsvpStatus;
+  adultsCount: number;
+  childrenCount: number;
+  comment: string;
+};
+type Attempt = {
+  key: string;
+  contextKey: string;
+  payload: ReturnType<typeof rsvpInput.parse>;
+};
+const empty: Draft = {
+  guestName: "",
+  status: "yes",
+  adultsCount: 1,
+  childrenCount: 0,
+  comment: "",
+};
+export function RsvpCard({
+  event,
+  onUnavailable,
+}: {
+  event: PublicEvent;
+  onUnavailable: () => void;
+}) {
+  const [context, setContext] = useState<GuestContext | null>(null),
+    [loading, setLoading] = useState(true),
+    [pending, setPending] = useState(false),
+    [offline, setOffline] = useState(false);
+  const [draft, setDraft] = useState<Draft>(empty),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [success, setSuccess] = useState(false),
+    [conflict, setConflict] = useState(false),
+    [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const dialog = useRef<HTMLDialogElement>(null),
+    form = useRef<HTMLFormElement>(null),
+    source = useRef<HTMLElement | null>(null),
+    busy = useRef(false),
+    flight = useRef<Promise<GuestContext> | null>(null),
+    last = useRef(0);
+  const base = useRef<{
+    id: string | null;
+    version: number | null;
+    contextKey: string | null;
+  }>({ id: null, version: null, contextKey: null });
+  const contextRef = useRef<GuestContext | null>(null),
+    panel = useRef<HTMLElement>(null);
+  const path = `/api/v1/public/events/${event.publicId}`;
+  const load = useCallback(() => {
+    if (flight.current) return flight.current;
+    const work = (async () => {
+      const response = await fetch(path + "/my-context", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      if (response.status === 404) {
+        onUnavailable();
+        throw Error("Это мероприятие недоступно.");
+      }
+      if (!response.ok)
+        throw Error("Не удалось проверить ваш ответ. Повторите попытку.");
+      const data: GuestContext = (await response.json()).data;
+      if (
+        contextRef.current?.contextKey &&
+        contextRef.current.contextKey !== data.contextKey
+      )
+        setNotice(
+          "Данные гостя изменились. Прежний ответ нельзя восстановить только по имени.",
+        );
+      if (
+        contextRef.current?.contextKey &&
+        contextRef.current.contextKey !== data.contextKey &&
+        data.sessionState === "active"
+      ) {
+        setDraft(empty);
+        setSuccess(false);
+        setConflict(true);
+        if (!busy.current) dialog.current?.close();
+      }
+      contextRef.current = data;
+      setContext(data);
+      return data;
+    })().finally(() => {
+      flight.current = null;
+      last.current = Date.now();
+      setLoading(false);
+    });
+    flight.current = work;
+    return work;
+  }, [path, onUnavailable]);
+  useEffect(() => {
+    const network = () => setOffline(!navigator.onLine);
+    network();
+    const restore = () => {
+      if (
+        document.visibilityState === "visible" &&
+        !busy.current &&
+        Date.now() - last.current > 1000
+      )
+        void load()
+          .then(async (current) => {
+            const app = (
+              window as Window & {
+                Telegram?: { WebApp?: { initData?: string } };
+              }
+            ).Telegram?.WebApp;
+            if (current.sessionState !== "none") return;
+            if (app?.initData) {
+              const auth = await fetch("/api/auth/telegram/mini-app", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ initData: app.initData }),
+                signal: AbortSignal.timeout(10000),
+              });
+              if (!auth.ok) return;
+            } else {
+              const me = await fetch("/api/v1/me", {
+                cache: "no-store",
+                signal: AbortSignal.timeout(10000),
+              });
+              if (!me.ok) return;
+            }
+            const prepared = await fetch("/api/guest/session", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: "{}",
+              signal: AbortSignal.timeout(10000),
+            });
+            if (prepared.ok) await load();
+          })
+          .catch((e) => setError(e.message));
+    };
+    const show = (e: PageTransitionEvent) => {
+      if (e.persisted) restore();
+    };
+    restore();
+    window.addEventListener("online", network);
+    window.addEventListener("offline", network);
+    window.addEventListener("online", restore);
+    window.addEventListener("pageshow", show);
+    document.addEventListener("visibilitychange", restore);
+    const interval = window.setInterval(restore, 30000),
+      stop = watchEventChanges(restore);
+    return () => {
+      window.removeEventListener("online", network);
+      window.removeEventListener("offline", network);
+      window.removeEventListener("online", restore);
+      window.removeEventListener("pageshow", show);
+      document.removeEventListener("visibilitychange", restore);
+      window.clearInterval(interval);
+      stop();
+    };
+  }, [load]);
+  function open(status: RsvpStatus) {
+    if (!context || busy.current) return;
+    source.current = document.activeElement as HTMLElement;
+    if (!attempt)
+      base.current = {
+        id: context.rsvp?.id ?? null,
+        version: context.rsvp?.version ?? null,
+        contextKey: context.contextKey,
+      };
+    setSuccess(false);
+    setConflict(false);
+    setError("");
+    setErrors({});
+    if (!attempt)
+      setDraft(
+        context.rsvp
+          ? {
+              guestName: context.rsvp.guestName,
+              status: context.rsvp.status,
+              adultsCount: context.rsvp.adultsCount || 1,
+              childrenCount: context.rsvp.childrenCount,
+              comment: context.rsvp.comment ?? "",
+            }
+          : { ...empty, status, guestName: context.defaultName ?? "" },
+      );
+    void capture(
+      "rsvp_started",
+      {
+        mode: context.rsvp ? "edit" : "create",
+        form_instance_id: crypto.randomUUID(),
+        initial_status: status,
+      },
+      { kind: "public", id: event.publicId },
+    );
+    setModalOpen(true);
+    dialog.current?.showModal();
+  }
+  async function bootstrap(restart = false) {
+    const app = (
+      window as Window & { Telegram?: { WebApp?: { initData?: string } } }
+    ).Telegram?.WebApp;
+    if (app?.initData && context?.sessionState !== "active") {
+      const auth = await fetch("/api/auth/telegram/mini-app", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData: app.initData }),
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!auth.ok)
+        throw Error(
+          "Не удалось подтвердить Telegram. Перезапустите приложение; введённые поля сохранены.",
+        );
+    }
+    const response = await fetch("/api/guest/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(restart ? { restart: true } : {}),
+      signal: AbortSignal.timeout(10000),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      if (result.error?.code === "GUEST_LINK_REQUIRED") {
+        setNotice(result.error.message);
+        return load();
+      }
+      throw Error(
+        result.error?.message ??
+          "Не удалось подготовить ответ. Проверьте соединение и попробуйте снова.",
+      );
+    }
+    return load();
+  }
+  async function submit() {
+    if (busy.current || offline || context?.sessionState === "lost" || conflict)
+      return;
+    let operation = attempt;
+    let analyticsFailed = false;
+    const payload = {
+      ...draft,
+      adultsCount: draft.status === "no" ? 0 : draft.adultsCount,
+      childrenCount: draft.status === "no" ? 0 : draft.childrenCount,
+      expectedVersion: base.current.version,
+    };
+    if (!operation) {
+      const parsed = rsvpInput.safeParse(payload);
+      if (!parsed.success) {
+        failure(
+          "rsvp_save",
+          crypto.randomUUID(),
+          { kind: "public", id: event.publicId },
+          { code: "VALIDATION_ERROR" },
+        );
+        const fieldErrors: Record<string, string> = {};
+        for (const issue of parsed.error.issues)
+          fieldErrors[String(issue.path[0])] =
+            (
+              {
+                guestName: "Введите имя от 2 до 60 символов.",
+                adultsCount: "Взрослых — целое число от 1 до 20.",
+                childrenCount: "Детей — целое число от 0 до 20.",
+                comment: "Комментарий — до 300 символов.",
+              } as Record<string, string>
+            )[String(issue.path[0])] ?? "Проверьте поле.";
+        setErrors(fieldErrors);
+        form.current
+          ?.querySelector<HTMLElement>(
+            `[name="${Object.keys(fieldErrors)[0]}"]`,
+          )
+          ?.focus();
+        return;
+      }
+    }
+    busy.current = true;
+    setPending(true);
+    setError("");
+    setErrors({});
+    let sent = false;
+    try {
+      const fresh = operation ? await load() : await bootstrap();
+      if (fresh.sessionState !== "active" || !fresh.contextKey)
+        throw Error(
+          "Не удалось узнать ваш прежний ответ. Чтобы ответить заново, подтвердите продолжение как новый гость.",
+        );
+      if (operation && operation.contextKey !== fresh.contextKey) {
+        setConflict(true);
+        throw Error(
+          "Гость изменился. Прежний запрос нельзя повторить от другого имени.",
+        );
+      }
+      if (
+        !operation &&
+        (base.current.id !== (fresh.rsvp?.id ?? null) ||
+          base.current.version !== (fresh.rsvp?.version ?? null) ||
+          (base.current.contextKey !== null &&
+            base.current.contextKey !== fresh.contextKey))
+      ) {
+        setConflict(true);
+        throw Error(
+          "На сервере уже есть другой ответ. Загрузите текущий ответ перед сохранением.",
+        );
+      }
+      operation ??= {
+        key: crypto.randomUUID(),
+        contextKey: fresh.contextKey,
+        payload: rsvpInput.parse(payload),
+      };
+      const csrf = await fetch("/api/auth/csrf?context=guest", {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!csrf.ok) {
+        await load();
+        throw Error(
+          "Не удалось подтвердить данные гостя. Ответ не отправлен; откройте приглашение на прежнем устройстве.",
+        );
+      }
+      const token = (await csrf.json()).data.csrfToken;
+      setAttempt(operation);
+      sent = true;
+      const response = await fetch(path + "/rsvp", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": token,
+          "idempotency-key": operation.key,
+          ...telemetryHeaders(operation.key),
+        },
+        body: JSON.stringify(operation.payload),
+        signal: AbortSignal.timeout(15000),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        analyticsFailed = true;
+        failure(
+          "rsvp_save",
+          operation.key,
+          { kind: "public", id: event.publicId },
+          { code: result.error?.code },
+        );
+      }
+      if (response.status === 404) {
+        onUnavailable();
+        return;
+      }
+      if (!response.ok) {
+        if (
+          [401, 403, 422, 429].includes(response.status) ||
+          result.error?.code === "RSVP_VERSION_CONFLICT"
+        ) {
+          setAttempt(null);
+          sent = false;
+        }
+        if (response.status === 401) await load();
+        if (result.error?.code === "RSVP_VERSION_CONFLICT") setConflict(true);
+        throw Error(result.error?.message ?? "Не удалось сохранить ответ.");
+      }
+      const saved = result.data.rsvp;
+      const updated = {
+        ...fresh,
+        rsvp:
+          fresh.rsvp && fresh.rsvp.version > saved.version ? fresh.rsvp : saved,
+      };
+      contextRef.current = updated;
+      setContext(updated);
+      setAttempt(null);
+      setSuccess(true);
+      setConflict(false);
+      announceEventChange();
+    } catch (caught) {
+      if (!analyticsFailed)
+        failure(
+          "rsvp_save",
+          operation?.key ?? crypto.randomUUID(),
+          { kind: "public", id: event.publicId },
+          caught,
+        );
+      setError(
+        sent
+          ? "Результат пока неизвестен. Нажмите «Проверить сохранение»: повторим прежнюю операцию без дубля."
+          : caught instanceof Error
+            ? caught.message
+            : "Не удалось сохранить ответ.",
+      );
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
+  }
+  async function restart() {
+    if (busy.current || offline || attempt) return;
+    if (
+      !window.confirm(
+        "Прежний ответ недоступен. Продолжить как новый гость? Прежний ответ и выбор подарков не восстановятся по имени.",
+      )
+    )
+      return;
+    busy.current = true;
+    setPending(true);
+    try {
+      await bootstrap(true);
+      setNotice(
+        "Можно ответить как новый гость. Ответ ещё не отправлен; проверьте и подтвердите форму.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Не удалось продолжить как новый гость. Попробуйте снова.",
+      );
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
+  }
+  function close() {
+    if (!busy.current) {
+      dialog.current?.close();
+      setSuccess(false);
+    }
+  }
+  const lost = context?.sessionState === "lost";
+  return (
+    <section
+      ref={panel}
+      className="panel rsvp-panel"
+      aria-labelledby="rsvp-heading"
+      aria-busy={loading || pending}
+    >
+      <TelegramBack
+        onBack={() => {
+          if (dialog.current?.open) close();
+          else window.history.back();
+        }}
+        warnBeforeClose={pending || !!attempt}
+      />
+      <h2 id="rsvp-heading">Вы придёте?</h2>
+      {loading ? (
+        <p role="status">Загружаем ваш ответ…</p>
+      ) : !context ? (
+        <>
+          <p className="error" role="alert">
+            {error || "Не удалось проверить ваш ответ."}
+          </p>
+          <button
+            className="secondary"
+            onClick={() => {
+              setLoading(true);
+              void load().catch((e) => setError(e.message));
+            }}
+          >
+            Попробовать снова
+          </button>
+        </>
+      ) : (
+        <>
+          {notice && (
+            <p className="notice" role="status">
+              {notice}
+            </p>
+          )}
+          {lost ? (
+            <>
+              <p className="notice">
+                Ваш прежний ответ недоступен. Его нельзя восстановить по имени.
+              </p>
+              <button
+                className="secondary"
+                disabled={pending || offline || !!attempt}
+                onClick={restart}
+              >
+                Продолжить как новый гость
+              </button>
+              {attempt && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Не удалось проверить прежнюю отправку. Прекратить проверку и ответить заново? Это не восстановит прежний ответ.",
+                      )
+                    ) {
+                      setAttempt(null);
+                      setConflict(false);
+                    }
+                  }}
+                >
+                  Прекратить проверку отправки
+                </button>
+              )}
+            </>
+          ) : context.rsvp ? (
+            <>
+              <p className="status-answer">
+                Ваш ответ: {rsvpLabels[context.rsvp.status]}
+              </p>
+              {context.rsvp.status !== "no" && (
+                <p>
+                  {adultsCount(context.rsvp.adultsCount)} ·{" "}
+                  {childrenCount(context.rsvp.childrenCount)}
+                </p>
+              )}
+              <button
+                className="secondary"
+                disabled={pending || offline}
+                onClick={() => open(context.rsvp!.status)}
+              >
+                Изменить ответ
+              </button>
+            </>
+          ) : (
+            <div className="rsvp-buttons">
+              {Object.entries(rsvpLabels).map(([status, label]) => (
+                <button
+                  key={status}
+                  className={status === "yes" ? "primary" : "secondary"}
+                  disabled={pending || offline}
+                  onClick={() => open(status as RsvpStatus)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {error && !modalOpen && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <p className="hint">
+            Регистрация не нужна. Изменить ответ можно на этом устройстве. После
+            очистки данных браузера или на другом устройстве прежний ответ может
+            быть недоступен.
+          </p>
+        </>
+      )}
+      {context?.rsvp && (
+        <Link
+          className="secondary route-link"
+          href={`/e/${event.publicId}/notifications`}
+        >
+          {context.notificationsEnabled
+            ? "Настроить уведомления"
+            : "Получать напоминания в Telegram"}
+        </Link>
+      )}
+      <dialog
+        ref={dialog}
+        className="rsvp-dialog"
+        aria-labelledby="rsvp-dialog-heading"
+        aria-busy={pending}
+        onCancel={(e) => {
+          if (busy.current) e.preventDefault();
+        }}
+        onClose={() => {
+          setModalOpen(false);
+          if (source.current?.isConnected) source.current.focus();
+          else
+            panel.current
+              ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+              ?.focus();
+        }}
+      >
+        {success ? (
+          <>
+            <h2 id="rsvp-dialog-heading">Спасибо! Ваш ответ сохранён</h2>
+            {context?.rsvp?.status === "yes" && (
+              <p>Увидимся {eventDateLabel(event.eventDate)}.</p>
+            )}
+            <p>Ваш ответ: {context?.rsvp && rsvpLabels[context.rsvp.status]}</p>
+            <Link
+              className="text-button route-link"
+              href={`/e/${event.publicId}/notifications`}
+            >
+              Получать напоминания в Telegram
+            </Link>
+            <Link
+              className="secondary route-link"
+              href={`/e/${event.publicId}/wishlist`}
+            >
+              Что подарить
+            </Link>
+            <button className="primary" autoFocus onClick={close}>
+              К событию
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 id="rsvp-dialog-heading">
+              {context?.rsvp ? "Изменить ответ" : "Ответить на приглашение"}
+            </h2>
+            <form
+              ref={form}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void submit();
+              }}
+              noValidate
+            >
+              <fieldset disabled={pending || !!attempt}>
+                <label className="field">
+                  Ваше имя *
+                  <input
+                    name="guestName"
+                    value={draft.guestName}
+                    maxLength={120}
+                    autoComplete="name"
+                    onChange={(e) =>
+                      setDraft({ ...draft, guestName: e.target.value })
+                    }
+                    aria-invalid={!!errors.guestName}
+                    aria-describedby="rsvp-name-error"
+                  />
+                </label>
+                <p id="rsvp-name-error" className="field-error">
+                  {errors.guestName}
+                </p>
+                <label className="field">
+                  Ваш ответ
+                  <select
+                    name="status"
+                    value={draft.status}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        status: e.target.value as RsvpStatus,
+                      })
+                    }
+                  >
+                    {Object.entries(rsvpLabels).map(([status, label]) => (
+                      <option key={status} value={status}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {draft.status !== "no" && (
+                  <div className="rsvp-counts">
+                    {(["adultsCount", "childrenCount"] as const).map((name) => (
+                      <label
+                        className="field"
+                        key={name}
+                        htmlFor={`rsvp-${name}`}
+                      >
+                        {name === "adultsCount" ? "Взрослых" : "Детей"}
+                        <span className="rsvp-stepper">
+                          <button
+                            type="button"
+                            className="secondary"
+                            aria-label={
+                              name === "adultsCount"
+                                ? "Уменьшить число взрослых"
+                                : "Уменьшить число детей"
+                            }
+                            disabled={
+                              draft[name] <= (name === "adultsCount" ? 1 : 0)
+                            }
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                [name]: Math.max(
+                                  name === "adultsCount" ? 1 : 0,
+                                  (Number.isFinite(draft[name])
+                                    ? draft[name]
+                                    : name === "adultsCount"
+                                      ? 1
+                                      : 0) - 1,
+                                ),
+                              })
+                            }
+                          >
+                            −
+                          </button>
+                          <input
+                            id={`rsvp-${name}`}
+                            name={name}
+                            type="number"
+                            min={name === "adultsCount" ? 1 : 0}
+                            max={20}
+                            step={1}
+                            inputMode="numeric"
+                            value={Number.isNaN(draft[name]) ? "" : draft[name]}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                [name]:
+                                  e.target.value === ""
+                                    ? NaN
+                                    : Number(e.target.value),
+                              })
+                            }
+                            aria-invalid={!!errors[name]}
+                          />
+                          <button
+                            type="button"
+                            className="secondary"
+                            aria-label={
+                              name === "adultsCount"
+                                ? "Увеличить число взрослых"
+                                : "Увеличить число детей"
+                            }
+                            disabled={draft[name] >= 20}
+                            onClick={() =>
+                              setDraft({
+                                ...draft,
+                                [name]: Math.min(
+                                  20,
+                                  (Number.isFinite(draft[name])
+                                    ? draft[name]
+                                    : name === "adultsCount"
+                                      ? 1
+                                      : 0) + 1,
+                                ),
+                              })
+                            }
+                          >
+                            +
+                          </button>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <label className="field">
+                  Комментарий
+                  <textarea
+                    name="comment"
+                    value={draft.comment}
+                    placeholder="Например, будем немного позже"
+                    onChange={(e) =>
+                      setDraft({ ...draft, comment: e.target.value })
+                    }
+                    aria-invalid={!!errors.comment}
+                    aria-describedby="rsvp-comment-count"
+                  />
+                </label>
+                <p
+                  className={
+                    [...draft.comment.trim()].length > 300 ? "error" : "hint"
+                  }
+                  aria-live="polite"
+                  id="rsvp-comment-count"
+                >
+                  {[...draft.comment.trim()].length}/300
+                  {[...draft.comment.trim()].length > 300
+                    ? " — сократите комментарий"
+                    : ""}
+                </p>
+              </fieldset>
+              {Object.entries(errors)
+                .filter(([key]) => key !== "guestName")
+                .map(([key, message]) => (
+                  <p key={key} className="field-error" role="alert">
+                    {message}
+                  </p>
+                ))}
+              {error && (
+                <p className="notice error" role="alert">
+                  {error}
+                </p>
+              )}
+              {offline && (
+                <p role="status">
+                  Нет соединения. Ввод остаётся в форме; ответ ещё не отправлен.
+                </p>
+              )}
+              {conflict && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={pending || offline}
+                  onClick={async () => {
+                    if (
+                      !window.confirm(
+                        "Загрузить текущий ответ? Введённые изменения будут заменены.",
+                      )
+                    )
+                      return;
+                    try {
+                      const current = await load();
+                      base.current = {
+                        id: current.rsvp?.id ?? null,
+                        version: current.rsvp?.version ?? null,
+                        contextKey: current.contextKey,
+                      };
+                      setAttempt(null);
+                      setConflict(false);
+                      setError("");
+                      setDraft(
+                        current.rsvp
+                          ? {
+                              guestName: current.rsvp.guestName,
+                              status: current.rsvp.status,
+                              adultsCount: current.rsvp.adultsCount || 1,
+                              childrenCount: current.rsvp.childrenCount,
+                              comment: current.rsvp.comment ?? "",
+                            }
+                          : { ...empty, guestName: current.defaultName ?? "" },
+                      );
+                    } catch (caught) {
+                      setError(
+                        caught instanceof Error
+                          ? caught.message
+                          : "Не удалось загрузить ответ.",
+                      );
+                    }
+                  }}
+                >
+                  Загрузить текущий ответ
+                </button>
+              )}
+              <button
+                type="button"
+                className="secondary"
+                disabled={pending}
+                onClick={close}
+              >
+                Отмена
+              </button>
+              <button
+                type="submit"
+                className="primary"
+                disabled={pending || offline || lost || conflict}
+              >
+                {pending
+                  ? "Сохраняем…"
+                  : attempt
+                    ? "Проверить сохранение"
+                    : context?.rsvp
+                      ? "Сохранить изменения"
+                      : "Подтвердить"}
+              </button>
+            </form>
+          </>
+        )}
+      </dialog>
+    </section>
+  );
+}

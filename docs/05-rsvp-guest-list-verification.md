@@ -1,0 +1,58 @@
+# Срез 05 — RSVP → Guest Session → Guest List
+
+12 октября 2026. Ветка `infrastructure-foundation`, существующий staging https://family-events-staging.vercel.app. Production/main не изменяются. `sources/` и Google Drive остаются только для чтения.
+
+## Источники и аудит
+
+Использованы [основные требования](https://docs.google.com/document/d/10kmsdz5r4npcpg5MK0Yq_RgGFObfUTPpaAFT92nBvfc/edit), [PRD](https://docs.google.com/document/d/1fIecJjtJZKOtvpBx_uS6XVmKlwi6Fm-hUxmdbODAzRE/edit), [Technical Specification](https://docs.google.com/document/d/1HrYTqMQAW-82OZBLHN9VO3JrNzccGqR0QgHjMYiU39o/edit), актуальные spec/HTML экранов 08–12 и 04 в [папке экранов](https://drive.google.com/drive/folders/1ebHh9Y6BTHK9Y3TtJZBILIaSLYUfFepd), аудит экранов и отчёты срезов 01–04. HTML 09–12 прочитаны перед реализацией.
+
+В foundation уже существовали таблицы RSVP/Guest Identity/Guest Session, hash-only cookie, CSRF, idempotency, outbox, подписки и ограничения полей. Реальные RSVP endpoints и экраны отсутствовали; у Event Management были только агрегаты. Повторно используется существующая схема, серверная роль, Telegram verifier и staging инфраструктура; миграций и новых ресурсов нет.
+
+В макете 08 есть блокировка ответа для прошедшего события, но PRD и задание не устанавливают такой cutoff; existing effective_at означает начало события. Без отдельного согласованного правила RSVP остаётся доступен для неудалённого события. Фиктивные wishlist/opt-in действия из макетов не показываются как рабочие функции.
+
+## Реализация и границы
+
+- Event Page получает собственный ответ только отдельным private/no-store `/my-context`; public DTO, SSR, OG и cover не содержат имени/комментария/Guest Identity. Public GET не создаёт Guest Session.
+- Первое подтверждённое действие создаёт серверную Guest Session на 180 дней: Secure, HttpOnly, SameSite=Lax, Path=/, в БД только hash. Токен, ответы и черновики не сохраняются в localStorage. Имя не удостоверяет личность. В настоящем Mini App используется существующая серверная проверка initData; обычный Telegram browser использует анонимную сессию.
+- `/api/v1/public/events/{publicId}/rsvp`: own GET и PUT с Origin/Guest CSRF, rate limit по IP/session, strict validation и idempotency. Имя 2–60 Unicode-символов после trim, комментарий до 300; yes/maybe: взрослых 1–20, детей 0–20; no: поля скрыты, БД 0/0. Чужой клиентский identity/user ID не принимается.
+- Одна запись на event/guest identity; при изменении стабильны id/created_at. expectedVersion фиксируется при открытии формы. Конфликт требует явной загрузки текущего ответа; двойной запрос повторяется тем же ключом. No-op сохраняет версию и не создаёт analytics/outbox. Неизвестный результат можно безопасно повторить без дубля, пока операция сохранена в памяти страницы.
+- Истёкшая/отозванная cookie возвращает lost state. Новая сессия создаётся только после подтверждения; старый анонимный ответ по имени не восстанавливается. Подтверждённый Telegram account связывается сервером с canonical identity. При наличии другой canonical identity анонимный ответ сохраняется, автоматического merge/перезаписи нет; полноценный hand-off/merge вне среза. Смена подтверждённого аккаунта блокирует использование linked identity другого пользователя.
+- Сохранение RSVP, analytics и N1/N2 outbox атомарно. Уведомления создаются только opted-in ready Organizer; trigger основан на RSVP id/version. При no отменяются pending/processing N4 reminders этой guest subscription. Отправка сообщений/cron и полный N4 rescheduling не активируются.
+- Organizer `/events/{id}/guests`, `/guests` API и `/summary` проверяют владельца и active Event. Safe DTO не содержит identity/session/контактов/резерваций. Фильтры: Все / Будут / Думают / Не будут. Счётчики относятся ко всему событию, люди считаются только из yes. Pagination сохраняет микросекунды PostgreSQL и позволяет получить все записи.
+- Guest List и Event Management обновляются каждые 5 секунд, когда страница видима и online, а также после возврата/online/cross-tab hint. Максимальная задержка зависит от сети и длительности запроса. Неизменившаяся ревизия сохраняет загруженные страницы; изменение возвращает к первой странице с пояснением. Event Management показывает последние три ответа. Offline данные помечены, ошибки имеют retry; 401/404 очищают приватный список.
+- Soft delete закрывает новые RSVP/context/guests/summary; исторические ответы остаются внутренними. Event lock сериализует удаление и RSVP.
+
+## Доступная проверка
+
+Локально: 35 тестов в 15 файлах, TypeScript, lint, production build и отсутствие server secrets в браузерных chunks. `tests/rsvp-slice.test.ts` вызывает реальные handlers/services под PostgreSQL PGlite/fe_server: session/bootstrap, права, Unicode/числовые границы, CSRF, version/idempotency/no-op, приватность, canonical binding/account switch, expiry/revocation, cursor/микросекунды, независимые totals, N1/N2 dedup, rollback при ошибке outbox, отмена N4, удаление.
+
+Hosted smoke `scripts/rsvp-smoke.ts` ограничен существующим staging и synthetic fixtures. Проверяет реальные HTTP/API/SSR и staging DB: две guest sessions с одинаковым именем, own context, повтор/конфликт/параллельные сохранения, счётчики, N1/N2, независимые Organizer/Guest запросы, 23 записи с pagination, expired/revoked session, гонку RSVP/delete и закрытие маршрутов. Скрипт удаляет только свои проверенные synthetic users/events/guest identities и дочерние записи; Bot API delivery не вызывается.
+
+Первый hosted запуск на `a105861` прошёл RSVP, create/edit/delete/public/Storage и infrastructure smoke с кодом 0 после cleanup. Регрессия auth выявила несовместимость bodyless bootstrap: Next/Vercel может передавать непустой объект stream для нулевого тела запроса. `ced4b87` добавляет явно разрешённое пустое тело только для Guest bootstrap, с прежней ограниченной strict JSON-проверкой для непустого тела. Добавлен тест пустого stream; остальные endpoints требуют JSON как прежде. Повторные локальные 35 тестов, lint/types/build прошли. Окончательные hosted/CI результаты указаны ниже.
+
+Физические iPhone Safari/PWA/Telegram, клавиатура, safe-area, Telegram SDK в реальном клиенте, VoiceOver и реальное фоновое обновление открытого браузера остаются ручными. HTTP-проверка независимых контекстов подтверждает серверную интеграцию, но не заменяет два открытых устройства. Browser interaction недоступен из-за невозможности проверить административную security policy.
+
+### Итог публикации
+
+`ced4b87` опубликован в существующую ветку. [Preview dpl_B3AfFBkxC8eVwJTnbn8YHE4r22vk](https://vercel.com/ast-dbae/family-events-miniapp/dpl_B3AfFBkxC8eVwJTnbn8YHE4r22vk) — READY, target=Preview, alias `family-events-staging.vercel.app`. Оба CI зелёные: [push](https://github.com/andrianshneider/family-events-miniapp/actions/runs/38221066845), [PR](https://github.com/andrianshneider/family-events-miniapp/actions/runs/38221072205).
+
+Повторные hosted RSVP и auth завершились с кодом 0 после cleanup. Create/edit/delete/public/Storage и infrastructure прошли на том же внедрённом срезе; после изменения только optional body parsing повторены затронутые auth/RSVP сценарии. Подтверждены hash/cookie flags/reuse, все статусы и сохранение, own context, чужие права, CSRF, idempotency/no-op/version conflict, параллельные create/update/delete, N1/N2 dedup, полная pagination с микросекундами, 5-секундный серверный контракт независимых контекстов, expiry/revocation/restart, публичная приватность и недоступность после удаления. Синтетические события, identities, sessions, analytics, outbox и Storage предыдущего regression smoke удалены; пользовательские данные не изменялись. Никакой отправки сообщений в Telegram, миграции, нового ресурса, main merge или Production deploy не выполнялось.
+
+## Ручной сценарий на iPhone
+
+1. Organizer: создайте тестовое событие и скопируйте его публичную ссылку. Откройте управление и «Список гостей». Ожидание: пустой список, все счётчики 0.
+2. Guest: откройте ссылку в Safari без Organizer login. Выберите «Буду». Введите имя, 2 взрослых, 1 ребёнка, комментарий. Ожидание: рабочая форма, подтверждение сохранения и «Ваш ответ» без регистрации.
+3. Обновите страницу, закройте/повторно откройте ссылку в том же Safari. Ожидание: тот же ответ и «Изменить ответ». В установленной PWA и Telegram browser проверьте отдельно: изолированные cookie-хранилища могут представлять разных гостей.
+4. Organizer на другом устройстве/в другом контексте: оставьте список видимым. Ожидание: без refresh появляется ответ; Будут=1, взрослых=2, детей=1, всего ответов=1. В Event Management — последний ответ. Обычно обновление происходит за 5 секунд плюс время сети.
+5. Guest: измените имя/комментарий и выберите «Пока не знаю», 3 взрослых/2 ребёнка. Ожидание: одна запись, Думают=1, подтверждённых людей=0; после refresh изменения сохранены.
+6. Выберите «Не буду». Ожидание: количество людей скрыто; Не будут=1, всего=1, подтверждённых взрослых/детей=0. Вернитесь к «Буду»: поля снова доступны, прежняя запись обновляется.
+7. Откройте ссылку на втором устройстве/в отдельном браузере. Ответьте с тем же именем. Ожидание: отдельная запись; первый гость не видит/не редактирует второй ответ. Имя не объединяет гостей.
+8. Проверьте пустое/однобуквенное имя, имя >60, комментарий >300, границы stepper/input. Ожидание: понятная ошибка и сохранённые поля; no не требует количество людей. Быстро нажмите подтверждение несколько раз: один RSVP.
+9. Откройте редактирование того же ответа в двух вкладках одного браузера. Сохраните в первой, затем во второй. Ожидание: конфликт и явное предложение загрузить актуальный ответ; свежий ответ не перезаписывается незаметно.
+10. Отключите сеть при редактировании. Ожидание: offline пояснение, черновик не исчезает, ложного успеха нет. Включите сеть, повторите. Если результат неизвестен, используйте «Проверить сохранение» — дубль не создаётся.
+11. Organizer: переключите все фильтры. Ожидание: соответствующие записи и неизменные общие счётчики. При >20 ответах «Показать ещё» открывает остальные; обычный фоновый refresh не сбрасывает страницы без изменений данных.
+12. Другой Organizer: откройте прямой URL управления/списка первого Organizer. Ожидание: недоступность без имён/комментариев. После выхода приватные страницы требуют login.
+13. Только для тестового гостя очистите данные сайта и заново откройте приглашение. Ожидание: старый анонимный ответ не восстанавливается по имени, новый ответ создаётся отдельно только после явной отправки. Доступ к старому ответу после удаления cookie восстановить нельзя.
+14. Откройте приглашение в настоящем Mini App и отправьте/измените RSVP. Ожидание: подтверждённая Telegram identity, сохранение/refresh без подмены аккаунта. При конфликте anonymous/canonical — пояснение, старый ответ не затирается.
+15. Organizer: удалите только тестовое событие. Ожидание: public page и ранее открытая guest page после refresh/возврата недоступны, сохранить RSVP нельзя; Guest List/управление закрыты.
+16. Повторите основные шаги в Safari, установленной PWA и Telegram на iPhone: проверьте прокрутку, клавиатуру, модальные окна, кнопку назад, длинные имя/комментарий и safe-area. Не передавайте cookies, initData или токены в отчёте.

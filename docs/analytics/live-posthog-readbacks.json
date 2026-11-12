@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-17",
+  "projectId": 670592,
+  "dashboard": "https://us.posthog.com/project/670592/dashboard/2223265",
+  "insights": [
+    {
+      "widget": 1,
+      "id": "7obZSBJx"
+    },
+    {
+      "widget": 2,
+      "url": "/project/670592/insights/JZlXb88P?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 3,
+      "url": "/project/670592/insights/nionMuBW?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 4,
+      "url": "/project/670592/insights/vdmDdB0j?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 5,
+      "url": "/project/670592/insights/wGkHQxXV?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 6,
+      "url": "/project/670592/insights/Ftk7emyF?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 7,
+      "url": "/project/670592/insights/TslniRLl?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 8,
+      "url": "/project/670592/insights/7KzRlmfs?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 9,
+      "url": "/project/670592/insights/kCplhCSL?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 10,
+      "url": "/project/670592/insights/oubOY7AG?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 11,
+      "url": "/project/670592/insights/G6o6hWpb?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    },
+    {
+      "widget": 12,
+      "url": "/project/670592/insights/aqDSZ1C0?dashboard=2223265&variables_override=%7B%7D&filters_override=%7B%7D&tile_filters_override=%7B%7D"
+    }
+  ],
+  "qa": [
+    {
+      "test": "NSM synthetic current-day QA",
+      "rows": [
+        "metric String▲▼events UInt64▲▼Engaged Events — P0 lower bound1Active Events1"
+      ]
+    },
+    {
+      "test": "RSVP synthetic current-day QA",
+      "rows": [
+        "viewed UInt64▲▼started UInt64▲▼full_funnel UInt64▲▼short_funnel UInt64▲▼1111"
+      ]
+    },
+    {
+      "test": "Wishlist synthetic current-day QA",
+      "rows": [
+        "surface String▲▼viewers UInt64▲▼reserved UInt64▲▼full11"
+      ]
+    },
+    {
+      "test": "Explicit IP mask follow-up",
+      "rows": [
+        "facts UInt64▲▼masked_ips UInt64▲▼non_placeholder_ips UInt64▲▼url_defaults UInt64▲▼private_text_leaks UInt64▲▼22000"
+      ]
+    },
+    {
+      "test": "Verified canonical identity and first-touch",
+      "rows": [
+        "canonical_people UInt64▲▼distinct_aliases UInt64▲▼same_guest_event UInt64▲▼attributed_create UInt64▲▼private_text_leaks UInt64▲▼unwanted_defaults UInt64▲▼121100"
+      ]
+    }
+  ]
+}

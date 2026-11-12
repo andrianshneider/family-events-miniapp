@@ -1,0 +1,94 @@
+{
+  "name": "Family Events — MVP Product Dashboard",
+  "project_id": 670592,
+  "environment": "staging",
+  "timezone": "Europe/Moscow",
+  "dashboard_url": "https://us.posthog.com/project/670592/dashboard/2223265",
+  "engine": "HogQL / PostHog events",
+  "widgets": [
+    {
+      "id": 1,
+      "title": "01 · Созданные события и организаторы",
+      "sql": "SELECT uniqExact(properties.event_id) AS events,uniqExact(person.id) AS authors FROM events WHERE event='event_created' AND properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external' AND timestamp >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND timestamp < toStartOfDay(now(),'Europe/Moscow')",
+      "notes": "",
+      "status": "available"
+    },
+    {
+      "id": 2,
+      "title": "02 · Active Events / Engaged Events — P0",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), views AS (SELECT actor,eid,t FROM f WHERE name='event_viewed' AND p.view_mode='public'), active AS (SELECT DISTINCT r.eid FROM f r JOIN views v ON r.actor=v.actor AND r.eid=v.eid WHERE r.name='rsvp_submitted' AND r.t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND r.t < toStartOfDay(now(),'Europe/Moscow') AND v.t<=r.t AND v.t>=r.t-INTERVAL 30 DAY) SELECT 'Active Events' AS metric,count() AS events FROM active UNION ALL SELECT 'Engaged Events — P0 lower bound',uniqExact(eid) FROM f WHERE name IN ('rsvp_submitted','gift_reserved') AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow')",
+      "notes": "Active: same canonical actor+Event, non-owner public view in prior30d and first RSVP. Full Engaged requires P1 rsvp_changed.",
+      "status": "partial"
+    },
+    {
+      "id": 3,
+      "title": "03 · Создание — зрелое окно 24ч",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), cohort AS (SELECT actor,min(t) AS cohort_at FROM base WHERE name='app_entered' AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow') AND t<now()-INTERVAL 24 HOUR GROUP BY actor), steps AS (SELECT c.actor,max(s.name='event_creation_started' AND s.t>=c.cohort_at AND s.t<=c.cohort_at+INTERVAL 24 HOUR) AS started,max(s.name='event_creation_started' AND e.name='event_created' AND s.p.form_instance_id=e.p.form_instance_id AND s.t>=c.cohort_at AND e.t>=s.t AND e.t<=c.cohort_at+INTERVAL 24 HOUR) AS completed FROM cohort c LEFT JOIN base s ON s.actor=c.actor LEFT JOIN base e ON e.actor=c.actor GROUP BY c.actor) SELECT count() AS entered,sum(started) AS started,sum(completed) AS completed FROM steps",
+      "notes": "",
+      "status": "available"
+    },
+    {
+      "id": 4,
+      "title": "04 · Share actions → реальный reach — 7д",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), cohort AS (SELECT eid,min(t) AS cohort_at FROM base WHERE name='event_created' AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow') AND t<now()-INTERVAL 7 DAY GROUP BY eid), steps AS (SELECT c.eid,max(s.name IN ('share_initiated','invitation_link_copied') AND s.t>=c.cohort_at AND s.t<=c.cohort_at+INTERVAL 24 HOUR) AS distribution_action,max(s.name='share_result' AND s.p.outcome='ready' AND s.t>=c.cohort_at AND s.t<=c.cohort_at+INTERVAL 24 HOUR) AS ready,max(s.name='event_viewed' AND s.p.view_mode='public' AND s.t>=c.cohort_at AND s.t<=c.cohort_at+INTERVAL 7 DAY) AS reach,max(s.name='rsvp_submitted' AND s.t>=c.cohort_at AND s.t<=c.cohort_at+INTERVAL 7 DAY) AS first_value FROM cohort c LEFT JOIN base s ON c.eid=s.eid WHERE (s.name NOT IN ('event_viewed','rsvp_submitted') OR toString(s.p.actor_relation)!='known_owner') GROUP BY c.eid) SELECT count() AS events,sum(distribution_action) AS action_proxy,sum(ready) AS share_ready,sum(reach) AS guest_reach,sum(first_value) AS first_rsvp FROM steps",
+      "notes": "Event-level join, not a person funnel; actions/readiness are not sent invitations or delivery.",
+      "status": "available"
+    },
+    {
+      "id": 5,
+      "title": "05 · Публичные посетители — не владельцы",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), z AS (SELECT * FROM f WHERE name='event_viewed' AND p.view_mode='public' AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow')) SELECT uniqExact(actor) AS visitors,uniqExact(eid) AS events,uniqExact(tuple(actor,eid)) AS visitor_event_pairs,count() AS views FROM z",
+      "notes": "",
+      "status": "available"
+    },
+    {
+      "id": 6,
+      "title": "06 · Guest RSVP — actor+Event, 7д",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), cohort AS (SELECT actor,eid,min(t) AS cohort_at FROM f WHERE name='event_viewed' AND p.view_mode='public' AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow') AND t<now()-INTERVAL 7 DAY GROUP BY actor,eid), steps AS (SELECT c.actor,c.eid,max(s.name='rsvp_started' AND s.p.mode='create' AND s.t>=c.cohort_at AND s.t<=c.cohort_at+INTERVAL 7 DAY) AS started,max(r.name='rsvp_submitted' AND r.t>=c.cohort_at AND r.t<=c.cohort_at+INTERVAL 7 DAY) AS short_path,max(s.name='rsvp_started' AND s.p.mode='create' AND r.name='rsvp_submitted' AND s.t>=c.cohort_at AND r.t>=s.t AND r.t<=c.cohort_at+INTERVAL 7 DAY) AS full_path FROM cohort c LEFT JOIN f s ON c.actor=s.actor AND c.eid=s.eid LEFT JOIN f r ON c.actor=r.actor AND c.eid=r.eid GROUP BY c.actor,c.eid) SELECT count() AS viewed,sum(started) AS started,sum(full_path) AS full_funnel,sum(short_path) AS short_funnel FROM steps",
+      "notes": "",
+      "status": "available"
+    },
+    {
+      "id": 7,
+      "title": "07 · Wishlist — surfaces отдельно",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), z AS (SELECT * FROM base WHERE name='wishlist_viewed' AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow')) SELECT toString(p.surface) AS surface,count() AS views,uniqExact(actor) AS visitors,uniqExact(eid) AS events,countIf(p.is_empty=true) AS empty_views FROM z GROUP BY surface ORDER BY surface",
+      "notes": "",
+      "status": "available"
+    },
+    {
+      "id": 8,
+      "title": "08 · Wishlist → бронь — quick path, 7д",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), cohort AS (SELECT actor,eid,toString(p.surface) AS surface,min(t) AS cohort_at FROM f WHERE name='wishlist_viewed' AND p.surface IN ('preview','full') AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow') AND t<now()-INTERVAL 7 DAY GROUP BY actor,eid,surface), steps AS (SELECT c.actor,c.eid,c.surface,max(r.name='gift_reserved' AND r.t>=c.cohort_at AND r.t<=c.cohort_at+INTERVAL 7 DAY) AS reserved FROM cohort c LEFT JOIN f r ON c.actor=r.actor AND c.eid=r.eid GROUP BY c.actor,c.eid,c.surface) SELECT surface,count() AS viewers,sum(reserved) AS reserved FROM steps GROUP BY surface",
+      "notes": "RSVP/detail are not prerequisites; detail/start-intent require P1.",
+      "status": "partial"
+    },
+    {
+      "id": 9,
+      "title": "09 · Guest → Organizer — observed coverage, 30д",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), guest AS (SELECT actor,min(t) AS cohort_at FROM f WHERE name='event_viewed' AND p.view_mode='public' GROUP BY actor), cohort AS (SELECT * FROM guest WHERE cohort_at >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND cohort_at < toStartOfDay(now(),'Europe/Moscow') AND cohort_at<now()-INTERVAL 30 DAY), created AS (SELECT actor,min(t) AS first_created FROM base WHERE name='event_created' GROUP BY actor), steps AS (SELECT c.actor,max(e.name='event_created' AND e.t>=c.cohort_at AND e.t<=c.cohort_at+INTERVAL 30 DAY AND toString(e.p.origin_event_id)!='' AND e.t=cr.first_created) AS observed_first,max(e.name='event_created' AND toString(e.p.origin_event_id)!='') AS origin_coverage FROM cohort c LEFT JOIN base e ON c.actor=e.actor LEFT JOIN created cr ON c.actor=cr.actor WHERE cr.first_created>=c.cohort_at OR cr.first_created IS NULL GROUP BY c.actor) SELECT count() AS observed_guest_cohort,sum(observed_first) AS observed_first_organizers_30d,sum(origin_coverage) AS linked_origin_coverage FROM steps",
+      "notes": "Observed P0 history only. Earlier Organizer history before tracking is unknown; exact first-organizer query remains in first-party PostgreSQL. Never K-factor.",
+      "status": "partial"
+    },
+    {
+      "id": 10,
+      "title": "10 · Organizer return — exact / rolling D7",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), cohort AS (SELECT actor,eid,min(t) AS cohort_at FROM base WHERE name='event_created' AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow') AND t<now()-INTERVAL 8 DAY GROUP BY actor,eid), steps AS (SELECT c.actor,c.eid,max(r.name='event_viewed' AND r.p.view_mode='management' AND dateDiff('day',toDate(toTimeZone(c.cohort_at,'Europe/Moscow')),toDate(toTimeZone(r.t,'Europe/Moscow')))=7) AS exact_d7,max(r.name='event_viewed' AND r.p.view_mode='management' AND dateDiff('day',toDate(toTimeZone(c.cohort_at,'Europe/Moscow')),toDate(toTimeZone(r.t,'Europe/Moscow'))) BETWEEN 1 AND 7) AS rolling_d7 FROM cohort c LEFT JOIN base r ON c.actor=r.actor AND c.eid=r.eid GROUP BY c.actor,c.eid) SELECT count() AS mature_events,sum(exact_d7) AS exact_d7,sum(rolling_d7) AS rolling_d7 FROM steps",
+      "notes": "No fabricated values for immature cohorts; repeat creation90/180d requires history/retention.",
+      "status": "partial"
+    },
+    {
+      "id": 11,
+      "title": "11 · Guest return — rolling D7",
+      "sql": "WITH base AS (SELECT event AS name,uuid,timestamp AS t,toString(person.id) AS actor,toString(properties.event_id) AS eid,properties AS p FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND properties.traffic_class='external'), owners AS (SELECT eid,argMin(actor,t) AS owner FROM base WHERE name='event_created' GROUP BY eid), f AS (SELECT b.* FROM base b LEFT JOIN owners o ON b.eid=o.eid WHERE coalesce(toString(b.p.actor_relation),'unknown')!='known_owner' AND (coalesce(o.owner,'')='' OR b.actor!=o.owner)), cohort AS (SELECT actor,eid,min(t) AS cohort_at FROM f WHERE name IN ('rsvp_submitted','gift_reserved') AND t >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND t < toStartOfDay(now(),'Europe/Moscow') AND t<now()-INTERVAL 8 DAY GROUP BY actor,eid), steps AS (SELECT c.actor,c.eid,max(r.name='event_viewed' AND r.p.view_mode='public' AND dateDiff('day',toDate(toTimeZone(c.cohort_at,'Europe/Moscow')),toDate(toTimeZone(r.t,'Europe/Moscow'))) BETWEEN 1 AND 7) AS rolling_d7 FROM cohort c LEFT JOIN f r ON c.actor=r.actor AND c.eid=r.eid GROUP BY c.actor,c.eid) SELECT count() AS mature_guest_event_pairs,sum(rolling_d7) AS rolling_d7 FROM steps",
+      "notes": "Notification opt-in/sent/terminal require P1; no opened/read rate.",
+      "status": "partial"
+    },
+    {
+      "id": 12,
+      "title": "12 · Ошибки и coverage — все классы отдельно",
+      "sql": "SELECT toString(properties.traffic_class) AS traffic_class,event,toString(properties.operation) AS operation,toString(properties.outcome) AS outcome,toString(properties.error_code) AS error_code,count() AS facts,uniqExact(person.id) AS actors FROM events WHERE properties.schema_version='1.0' AND properties.environment='staging' AND timestamp >= toStartOfDay(now(),'Europe/Moscow') - INTERVAL 28 DAY AND timestamp < toStartOfDay(now(),'Europe/Moscow') GROUP BY traffic_class,event,operation,outcome,error_code ORDER BY traffic_class,event",
+      "notes": "Includes unknown/staff/synthetic only as labeled diagnostics, never in product funnels.",
+      "status": "available"
+    }
+  ]
+}

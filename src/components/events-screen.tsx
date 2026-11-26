@@ -285,6 +285,7 @@ export function EventsScreen({
       <Link href="/events/new" className="primary">
         {data?.resumeDraft ? "Продолжить создание" : "＋ Создать событие"}
       </Link>
+      <InstallHelp home />
       {data && (
         <p className="muted">{data.name}, здесь ваши праздники и встречи.</p>
       )}
@@ -341,7 +342,6 @@ export function EventsScreen({
             </p>
           </section>
         ))}
-      <InstallHelp />
     </main>
   );
 }

@@ -140,3 +140,13 @@ it("worker caches only the generic offline document and bypasses API, writes, as
   expect(await (await respondWith.mock.calls[1][0]).text()).toBe("offline");
   expect(put).toHaveBeenCalledTimes(1);
 });
+
+it("does not mistake a regular fullscreen browser window for an installed app", () => {
+  expect(
+    standalone({
+      matchMedia: (query: string) =>
+        ({ matches: query === "(display-mode: fullscreen)" }) as MediaQueryList,
+      navigator: {} as Navigator,
+    }),
+  ).toBe(false);
+});

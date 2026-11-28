@@ -12,7 +12,7 @@ Implemented slices: verified Telegram Mini App/OIDC login, server sessions, Orga
 
 Approved branding: Meetmallow with the orange embracing-marshmallows icon. See [brand assets](assets/brand/README.md). Infrastructure identifiers, repository URLs, Telegram bot username and session keys retain their existing names to preserve integrations and account identity.
 
-Development/staging remains on `infrastructure-foundation`. Changes may be merged to `main` for the GitHub source release; automatic Vercel deployments from `main` are explicitly disabled in `vercel.json`. Production publication is a separate action.
+All project work now starts from and is saved to `main`, including changes intended for staging. `infrastructure-foundation` is retired and retained only as historical architecture/testing work; do not use it for new changes or releases. Automatic Vercel deployments from `main` remain explicitly disabled in `vercel.json`; publication is a separate action.
 
 ## Local setup
 
@@ -139,7 +139,7 @@ Surprise DTO projections and all product CRUD/RSVP endpoints remain slice work. 
 
 ## CI, deployment, checks
 
-`.github/workflows/ci.yml`: install, lint, typecheck, unit tests, fresh database tests, build and browser-secret scan. `vercel.json` selects Next.js and a frozen pnpm installation. Connect the existing Vercel project to this existing GitHub repository; branch `infrastructure-foundation` deploys as Preview. Keep main production prototype until reviewed merge. No manual file upload deployment.
+`.github/workflows/ci.yml`: install, lint, typecheck, unit tests, fresh database tests, build and browser-secret scan. `vercel.json` selects Next.js and a frozen pnpm installation. The existing Vercel project remains connected to this GitHub repository. Use the current `main` commit for future Preview/staging and Production builds, explicitly selecting the intended target and its existing configuration. Do not build new work from the retired `infrastructure-foundation` branch. The currently published Production deployment is not changed by a GitHub-only update. No manual file upload deployment.
 
 ```sh
 pnpm lint

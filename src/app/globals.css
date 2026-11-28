@@ -1,4 +1,6 @@
 :root {
+  --color-brand-foreground: #7044b8;
+  --color-brand-border: #d9cde8;
   color-scheme: light;
   font-family: Arial, sans-serif;
   color: #302b3a;
@@ -91,8 +93,8 @@ p {
 }
 .secondary {
   background: white;
-  border: 1px solid #d9cde8;
-  color: #7044b8;
+  border: 1px solid var(--color-brand-border);
+  color: var(--color-brand-foreground);
 }
 .text-button {
   background: none;
@@ -398,7 +400,7 @@ a:focus-visible {
   color: #63409f;
   border: 0;
 }
-.event-shell dialog {
+.event-shell dialog, .install-dialog {
   border: 1px solid #e6dfe9;
   border-radius: 20px;
   padding: 24px;
@@ -407,10 +409,10 @@ a:focus-visible {
   overflow: auto;
   color: #292433;
 }
-.event-shell dialog::backdrop {
+.event-shell dialog::backdrop, .install-dialog::backdrop {
   background: #29243366;
 }
-.event-shell dialog button {
+.event-shell dialog button, .install-dialog button {
   width: 100%;
   margin-top: 12px;
 }
@@ -1684,3 +1686,13 @@ summary:focus-visible {
 .brand .brand-name { padding:0; background:none; color:inherit; font-size:inherit; border-radius:0; }
 @media (max-width:360px) { .brand { gap:8px; } .brand .brand-icon { width:40px; height:40px; flex-basis:40px; border-radius:10px; } }
 .event-shell .brand .brand-name { font-size:inherit; padding:0; border-radius:0; }
+
+.home-install { width:100%; margin:8px 0 0; }
+.home-install-button { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; font:inherit; line-height:1.4; }
+.home-install-button svg, .install-help button > svg { flex-shrink:0; }
+.home-install-button span { min-width:0; overflow-wrap:anywhere; }
+.install-help > button { display:flex; align-items:center; gap:10px; }
+.install-dialog { width:min(480px,calc(100% - 32px)); max-height:calc(100dvh - 32px); overflow-y:auto; box-sizing:border-box; }
+.install-dialog li { margin:12px 0; line-height:1.6; }
+
+.home-install-button { border-color:var(--color-brand-foreground); }
